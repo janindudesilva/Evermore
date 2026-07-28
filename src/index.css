@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Heritage palette */
+  --color-paper: #f5f1e8;
+  --color-ink: #1c1b19;
+  --color-ink-soft: #4a4844;
+  --color-muted: #a9825e;
+  --color-line: #c9bfae;
+  --color-card: #faf7f0;
+  --color-moss: #2c3b2d;
+  --color-moss-soft: #e8ede6;
+  --color-wine: #5e2129;
+  --color-wine-soft: #f0e4e6;
+  --color-gold: #b08d57;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+  html {
+    background: var(--color-paper);
+  }
+  body {
+    font-family: var(--font-display);
+    background: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-wine);
+    color: var(--color-paper);
+  }
+}
+
+@layer utilities {
+  .font-mono-label {
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+  }
+  .heading-rule {
+    border-bottom: 2px solid var(--color-gold);
+    padding-bottom: 0.35rem;
+    display: inline-block;
+  }
+  .tag-notch {
+    position: relative;
+  }
+  .tag-notch::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
+    z-index: 10;
+  }
+}
