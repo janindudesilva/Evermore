@@ -1,2 +1,5 @@
-node_modules
+# Covered by root .gitignore when using the full repo; kept for Backend-only workflows
+node_modules/
 .env
+.env.*
+!.env.example
