@@ -28,7 +28,7 @@ export default function SignIn() {
             THE EVERMORE
           </span>
           <div className="flex items-center justify-center py-16">
-            <GarmentIcon type="jacket" color="#F5F1E8" className="w-2/3 h-2/3 opacity-90" />
+            <GarmentIcon type="jacket" color="#FFFEFA" className="w-2/3 h-2/3 opacity-90" />
           </div>
           <div>
             <p className="italic text-lg mb-4">"Buy less. Choose well. Make it last."</p>
