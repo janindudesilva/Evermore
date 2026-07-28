@@ -47,11 +47,11 @@ export default function AdminDashboard() {
   const removeItem = (id) => setItems((prev) => prev.filter((p) => p.id !== id));
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-10 pb-24">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-16 sm:pb-24">
       <p className="font-mono-label text-xs uppercase text-muted mb-1">Admin</p>
-      <h1 className="font-display text-3xl font-semibold mb-8">Dashboard</h1>
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold mb-8">Dashboard</h1>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
         <Stat icon={Package} label="Products Listed" value={items.length} />
         <Stat icon={ShoppingBag} label="Orders This Week" value={mockOrders.length} />
         <Stat icon={LayoutGrid} label="Categories" value={4} />

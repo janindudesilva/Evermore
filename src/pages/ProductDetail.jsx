@@ -21,15 +21,15 @@ export default function ProductDetail() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-8 pb-24">
-      <div className="flex items-center justify-between mb-6 text-sm">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 sm:pb-24">
+      <div className="flex items-center justify-between mb-6 text-sm flex-wrap gap-2">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors"
         >
           <ArrowLeft size={15} /> Back to products
         </button>
-        <p className="text-muted font-mono-label text-xs">
+        <p className="text-muted font-mono-label text-xs truncate max-w-full">
           <Link to="/" className="hover:text-ink">
             Home
           </Link>{" "}
@@ -37,7 +37,7 @@ export default function ProductDetail() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-10">
+      <div className="grid md:grid-cols-2 gap-8 md:gap-10">
         <div className="tag-notch relative aspect-square rounded-3xl bg-card border border-line flex items-center justify-center">
           {product.tag && (
             <span className="absolute top-4 left-7 font-mono-label text-[10px] uppercase bg-wine text-paper px-2.5 py-1 rounded-full">
@@ -49,16 +49,16 @@ export default function ProductDetail() {
 
         <div>
           <p className="font-mono-label text-xs uppercase text-muted mb-2">
-            EVERMORE · {product.category}
+            THE EVERMORE · {product.category}
           </p>
-          <div className="flex items-start justify-between mb-2">
-            <h1 className="font-display text-3xl font-semibold">{product.name}</h1>
-            <span className="flex items-center gap-1 text-sm font-mono-label bg-card border border-line rounded-full px-2.5 py-1">
+          <div className="flex items-start justify-between mb-2 gap-2">
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold">{product.name}</h1>
+            <span className="flex items-center gap-1 text-sm font-mono-label bg-card border border-line rounded-full px-2.5 py-1 shrink-0">
               <Star size={12} className="fill-ink" /> {product.rating} ({product.reviews})
             </span>
           </div>
           <div className="flex items-baseline gap-2 mb-5">
-            <span className="font-mono-label text-2xl">${product.price}</span>
+            <span className="font-mono-label text-xl sm:text-2xl">${product.price}</span>
             {product.compareAt && (
               <>
                 <span className="font-mono-label text-muted line-through">${product.compareAt}</span>
@@ -68,7 +68,7 @@ export default function ProductDetail() {
               </>
             )}
           </div>
-          <p className="text-ink-soft mb-6">{product.description}</p>
+          <p className="text-ink-soft text-sm sm:text-base mb-6">{product.description}</p>
 
           <ul className="space-y-2 mb-7">
             {product.features.map((f) => (
@@ -88,7 +88,7 @@ export default function ProductDetail() {
                 <button
                   key={s}
                   onClick={() => setSize(s)}
-                  className={`w-11 h-11 rounded-full text-sm font-mono-label border transition-colors ${
+                  className={`w-10 sm:w-11 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-mono-label border transition-colors ${
                     size === s ? "bg-moss text-paper border-moss" : "border-line hover:border-gold/50"
                   }`}
                 >
@@ -111,19 +111,19 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mb-7">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-7">
             <button
               onClick={handleAdd}
               className="flex-1 bg-moss text-paper rounded-full py-3.5 text-sm font-medium hover:bg-moss/90 transition-colors"
             >
               {added ? "Added ✓" : `Add to cart (${qty})`}
             </button>
-            <button className="border border-line rounded-full px-5 py-3.5 text-sm font-medium flex items-center gap-2 hover:border-gold/60 transition-colors">
+            <button className="border border-line rounded-full px-5 py-3.5 text-sm font-medium flex items-center justify-center gap-2 hover:border-gold/60 transition-colors">
               <Heart size={15} /> Wishlist
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
             <Trust icon={ShieldCheck} title="Authentic" sub="100% Verified" />
             <Trust icon={Truck} title="Free Shipping" sub="Worldwide" />
             <Trust icon={RefreshCcw} title="Easy Returns" sub="30-day window" />

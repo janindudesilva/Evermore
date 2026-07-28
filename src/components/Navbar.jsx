@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Search, Heart, ShoppingBag, User } from "lucide-react";
+import { Search, Heart, ShoppingBag, User, Menu, X } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/Evermore Logo.jpeg";
@@ -14,15 +15,26 @@ const links = [
 export default function Navbar() {
   const { count } = useCart();
   const { user } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-line">
-      <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-2 font-display font-semibold text-lg tracking-tight">
-          <img src={logo} alt="Evermore Logo" className="w-7 h-7 rounded-full object-cover" />
-          EVERMORE
-        </Link>
+      <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3.5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="md:hidden w-9 h-9 rounded-full flex items-center justify-center border border-line bg-card text-ink"
+            aria-label="Toggle Navigation Menu"
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+          <Link to="/" className="flex items-center gap-2 font-display font-semibold text-base sm:text-lg tracking-tight">
+            <img src={logo} alt="The Evermore Logo" className="w-7 h-7 rounded-full object-cover" />
+            THE EVERMORE
+          </Link>
+        </div>
 
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1 bg-card border border-line rounded-full px-1.5 py-1.5">
           {links.map((l) => (
             <NavLink
@@ -40,23 +52,24 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
-          <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors">
+        {/* Header Action Buttons */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors">
             <Search size={17} strokeWidth={1.75} />
           </button>
           <Link
             to={user ? (user.role === "admin" ? "/admin" : "/account") : "/sign-in"}
-            className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors"
+            className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors"
             title={user ? user.name : "Sign in"}
           >
             <User size={17} strokeWidth={1.75} />
           </Link>
-          <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors">
+          <button className="w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors">
             <Heart size={17} strokeWidth={1.75} />
           </button>
           <Link
             to="/cart"
-            className="relative w-9 h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors"
+            className="relative w-8 sm:w-9 h-8 sm:h-9 rounded-full flex items-center justify-center hover:bg-card border border-transparent hover:border-line transition-colors"
           >
             <ShoppingBag size={17} strokeWidth={1.75} />
             {count > 0 && (
@@ -67,6 +80,28 @@ export default function Navbar() {
           </Link>
         </div>
       </div>
+
+      {/* Mobile Drawer Menu */}
+      {menuOpen && (
+        <nav className="md:hidden border-t border-line bg-paper px-6 py-4 space-y-2 animate-in slide-in-from-top duration-200">
+          {links.map((l) => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              end={l.to === "/"}
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) =>
+                `block px-4 py-2.5 rounded-xl text-base font-medium transition-colors ${
+                  isActive ? "bg-moss text-paper" : "text-ink bg-card border border-line"
+                }`
+              }
+            >
+              {l.label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
+

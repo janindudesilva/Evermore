@@ -47,9 +47,9 @@ export default function Checkout() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 pt-10 pb-24 grid md:grid-cols-[1fr_320px] gap-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-16 sm:pb-24 grid md:grid-cols-[1fr_320px] gap-8 md:gap-10">
       <div>
-        <h1 className="font-display text-3xl font-semibold mb-6">Checkout</h1>
+        <h1 className="font-display text-2xl sm:text-3xl font-semibold mb-6">Checkout</h1>
 
         {!user && (
           <div className="flex gap-2 mb-6 bg-card border border-line rounded-full p-1.5 w-fit">
@@ -76,14 +76,14 @@ export default function Checkout() {
           </p>
         )}
 
-        <form onSubmit={handlePlaceOrder} className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handlePlaceOrder} className="space-y-4 sm:space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Full Name" placeholder="Jane Doe" />
             <Field label="Phone Number" placeholder="+94 71 234 5678" />
           </div>
           {mode === "guest" && !user && <Field label="Email Address" placeholder="jane@example.com" />}
           <Field label="Delivery Address" placeholder="123 Main Street, Colombo" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="City" placeholder="Negombo" />
             <Field label="Postal Code" placeholder="11500" />
           </div>

@@ -16,12 +16,12 @@ export default function Register() {
   };
 
   return (
-    <div className="max-w-md mx-auto px-6 pt-8 pb-24">
+    <div className="max-w-md mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 sm:pb-24">
       <Link to="/" className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink mb-6">
         <ArrowLeft size={15} /> Back to home
       </Link>
-      <div className="bg-card border border-line rounded-3xl p-10">
-        <p className="font-mono-label text-xs uppercase text-muted mb-2">Join EVERMORE</p>
+      <div className="bg-card border border-line rounded-3xl p-6 sm:p-10">
+        <p className="font-mono-label text-xs uppercase text-muted mb-2">Join THE EVERMORE</p>
         <h1 className="font-display text-3xl font-semibold mb-2">Create Account</h1>
         <p className="text-sm text-muted mb-6">
           Already have one?{" "}

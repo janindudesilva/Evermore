@@ -7,8 +7,8 @@ export default function Account() {
   if (!user) return <Navigate to="/sign-in" replace />;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 pt-10 pb-24">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-16 sm:pb-24">
+      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
           <p className="font-mono-label text-xs uppercase text-muted mb-1">My Account</p>
           <h1 className="font-display text-3xl font-semibold">Welcome back, {user.name}</h1>

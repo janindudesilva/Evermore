@@ -10,7 +10,7 @@ const icons = {
 
 export default function CategoryPills({ categories, active, onChange }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-nowrap sm:flex-wrap items-center gap-2 overflow-x-auto pb-2 scrollbar-none max-w-full">
       {categories.map((c) => {
         const Icon = icons[c] || Grid2x2;
         const isActive = active === c;
@@ -18,7 +18,7 @@ export default function CategoryPills({ categories, active, onChange }) {
           <button
             key={c}
             onClick={() => onChange(c)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs sm:text-sm font-medium border shrink-0 transition-colors ${
               isActive
                 ? "bg-moss text-paper border-moss"
                 : "bg-card text-ink-soft border-line hover:border-gold/60"

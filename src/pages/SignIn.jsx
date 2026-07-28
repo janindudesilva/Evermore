@@ -17,7 +17,7 @@ export default function SignIn() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-6 pt-8 pb-24">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 sm:pb-24">
       <Link to="/" className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink mb-6">
         <ArrowLeft size={15} /> Back to home
       </Link>
@@ -25,7 +25,7 @@ export default function SignIn() {
       <div className="grid md:grid-cols-2 gap-0 bg-card border border-line rounded-3xl overflow-hidden">
         <div className="hidden md:flex flex-col justify-between bg-moss text-paper p-10 relative">
           <span className="font-mono-label text-xs uppercase bg-paper/15 w-fit px-2.5 py-1 rounded-full">
-            EVERMORE
+            THE EVERMORE
           </span>
           <div className="flex items-center justify-center py-16">
             <GarmentIcon type="jacket" color="#F5F1E8" className="w-2/3 h-2/3 opacity-90" />
@@ -40,7 +40,7 @@ export default function SignIn() {
           </div>
         </div>
 
-        <div className="p-10">
+        <div className="p-6 sm:p-10">
           <p className="font-mono-label text-xs uppercase text-muted mb-2">Welcome Back</p>
           <h1 className="font-display text-3xl font-semibold mb-2">Sign In</h1>
           <p className="text-sm text-muted mb-6">

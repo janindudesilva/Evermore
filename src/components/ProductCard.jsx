@@ -28,7 +28,7 @@ export default function ProductCard({ product }) {
       </div>
       <div className="p-4">
         <p className="font-mono-label text-[11px] uppercase text-muted mb-1">
-          EVERMORE · {product.line}
+          THE EVERMORE · {product.line}
         </p>
         <div className="flex items-center justify-between">
           <p className="font-medium">{product.name}</p>
