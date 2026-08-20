@@ -40,7 +40,7 @@ export default function ProductDetail() {
       <div className="grid md:grid-cols-2 gap-8 md:gap-10">
         <div className="tag-notch relative aspect-square rounded-3xl bg-card border border-line flex items-center justify-center">
           {product.tag && (
-            <span className="absolute top-4 left-7 font-mono-label text-[10px] uppercase bg-wine text-paper px-2.5 py-1 rounded-full">
+            <span className="absolute top-4 left-7 font-mono-label text-[9px] sm:text-[10px] uppercase bg-wine text-paper px-2 sm:px-2.5 py-1 rounded-full max-w-[calc(100%-3rem)] truncate">
               {product.tag}
             </span>
           )}
