@@ -1,24 +1,94 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Minus, Plus, ShieldCheck, Truck, RefreshCcw, Heart, Star } from "lucide-react";
-import { getProduct, products } from "../data/products";
+import { ArrowLeft, Check, Minus, Plus, ShieldCheck, Truck, RefreshCcw, Heart, Star, AlertCircle, Package } from "lucide-react";
 import GarmentIcon from "../components/GarmentIcon";
 import { useCart } from "../context/CartContext";
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const product = getProduct(id) || products[0];
-  const [size, setSize] = useState(product.sizes[1] || product.sizes[0]);
+
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [size, setSize] = useState("");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const { addItem } = useCart();
 
+  const fetchProduct = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`/api/products/${id}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProduct(data.data);
+        if (data.data.sizes && data.data.sizes.length > 0) {
+          setSize(data.data.sizes[0]);
+        }
+      } else {
+        throw new Error(data.message || "Product not found");
+      }
+    } catch (err) {
+      console.error("Product detail fetch error:", err);
+      setError(err.message || "Failed to load product details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProduct();
+  }, [id]);
+
   const handleAdd = () => {
+    if (!product) return;
     addItem(product, size, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 sm:pb-24 animate-pulse">
+        <div className="h-4 bg-card rounded w-36 mb-6" />
+        <div className="grid md:grid-cols-2 gap-8 md:gap-10">
+          <div className="aspect-square rounded-3xl bg-card border border-line" />
+          <div className="space-y-4">
+            <div className="h-4 bg-card rounded w-24" />
+            <div className="h-8 bg-card rounded w-3/4" />
+            <div className="h-6 bg-card rounded w-20" />
+            <div className="h-20 bg-card rounded w-full" />
+            <div className="h-12 bg-card rounded w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-24 text-center">
+        <div className="bg-card border border-line rounded-3xl p-10 max-w-md mx-auto">
+          <AlertCircle size={36} className="mx-auto mb-3 text-wine" />
+          <h2 className="font-display text-2xl font-semibold mb-2">Product Not Found</h2>
+          <p className="text-sm text-muted mb-6">{error || "The product you are looking for does not exist."}</p>
+          <button
+            onClick={() => navigate("/shop")}
+            className="inline-flex items-center gap-2 bg-moss text-paper px-5 py-2.5 rounded-full text-sm font-medium hover:bg-moss/90"
+          >
+            <ArrowLeft size={15} /> Back to Shop
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const [selectedImage, setSelectedImage] = useState(0);
+
+  const hasImages = product.images && product.images.length > 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 sm:pb-24">
@@ -38,13 +108,45 @@ export default function ProductDetail() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-8 md:gap-10">
-        <div className="tag-notch relative aspect-square rounded-3xl bg-card border border-line flex items-center justify-center">
-          {product.tag && (
-            <span className="absolute top-4 left-7 font-mono-label text-[9px] sm:text-[10px] uppercase bg-wine text-paper px-2 sm:px-2.5 py-1 rounded-full max-w-[calc(100%-3rem)] truncate">
-              {product.tag}
-            </span>
+        <div>
+          <div className="tag-notch relative aspect-square rounded-3xl bg-card border border-line flex items-center justify-center overflow-hidden">
+            {product.tag && (
+              <span className="absolute top-4 left-7 z-10 font-mono-label text-[9px] sm:text-[10px] uppercase bg-wine text-paper px-2 sm:px-2.5 py-1 rounded-full max-w-[calc(100%-3rem)] truncate">
+                {product.tag}
+              </span>
+            )}
+            {hasImages ? (
+              <img
+                src={product.images[selectedImage] || product.images[0]}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <GarmentIcon type={product.type || "jacket"} color={product.color || "#1C1B19"} className="w-2/3 h-2/3" />
+            )}
+          </div>
+
+          {hasImages && product.images.length > 1 && (
+            <div className="flex gap-2.5 mt-3 overflow-x-auto pb-1">
+              {product.images.map((url, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImage(idx)}
+                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl border-2 overflow-hidden shrink-0 transition-all ${
+                    selectedImage === idx
+                      ? "border-moss shadow-sm"
+                      : "border-line hover:border-gold/50 opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={url}
+                    alt={`${product.name} ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
           )}
-          <GarmentIcon type={product.type} color={product.color} className="w-2/3 h-2/3" />
         </div>
 
         <div>
@@ -54,7 +156,7 @@ export default function ProductDetail() {
           <div className="flex items-start justify-between mb-2 gap-2">
             <h1 className="font-display text-2xl sm:text-3xl font-semibold">{product.name}</h1>
             <span className="flex items-center gap-1 text-sm font-mono-label bg-card border border-line rounded-full px-2.5 py-1 shrink-0">
-              <Star size={12} className="fill-ink" /> {product.rating} ({product.reviews})
+              <Star size={12} className="fill-ink" /> {product.rating || 4.8} ({product.reviews || 0})
             </span>
           </div>
           <div className="flex items-baseline gap-2 mb-5">
@@ -70,33 +172,37 @@ export default function ProductDetail() {
           </div>
           <p className="text-ink-soft text-sm sm:text-base mb-6">{product.description}</p>
 
-          <ul className="space-y-2 mb-7">
-            {product.features.map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm">
-                <span className="w-5 h-5 rounded-full bg-moss text-paper flex items-center justify-center shrink-0">
-                  <Check size={11} />
-                </span>
-                {f}
-              </li>
-            ))}
-          </ul>
-
-          <div className="mb-6">
-            <p className="text-sm font-medium mb-2">Size</p>
-            <div className="flex flex-wrap gap-2">
-              {product.sizes.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSize(s)}
-                  className={`w-10 sm:w-11 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-mono-label border transition-colors ${
-                    size === s ? "bg-moss text-paper border-moss" : "border-line hover:border-gold/50"
-                  }`}
-                >
-                  {s}
-                </button>
+          {product.features && product.features.length > 0 && (
+            <ul className="space-y-2 mb-7">
+              {product.features.map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm">
+                  <span className="w-5 h-5 rounded-full bg-moss text-paper flex items-center justify-center shrink-0">
+                    <Check size={11} />
+                  </span>
+                  {f}
+                </li>
               ))}
+            </ul>
+          )}
+
+          {product.sizes && product.sizes.length > 0 && (
+            <div className="mb-6">
+              <p className="text-sm font-medium mb-2">Size</p>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSize(s)}
+                    className={`w-10 sm:w-11 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-mono-label border transition-colors ${
+                      size === s ? "bg-moss text-paper border-moss" : "border-line hover:border-gold/50"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex items-center gap-4 mb-6">
             <p className="text-sm font-medium">Quantity</p>
@@ -138,7 +244,7 @@ export default function ProductDetail() {
             <p className="text-sm text-muted">What buyers are saying</p>
           </div>
           <span className="flex items-center gap-1.5 font-mono-label text-sm bg-paper border border-line rounded-full px-3 py-1.5">
-            <Star size={13} className="fill-ink" /> {product.rating} ({product.reviews} reviews)
+            <Star size={13} className="fill-ink" /> {product.rating || 4.8} ({product.reviews || 0} reviews)
           </span>
         </div>
       </div>

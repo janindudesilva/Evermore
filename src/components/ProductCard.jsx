@@ -3,12 +3,14 @@ import { Heart } from "lucide-react";
 import GarmentIcon from "./GarmentIcon";
 
 export default function ProductCard({ product }) {
+  const hasImage = product.images && product.images.length > 0;
+
   return (
     <Link
-      to={`/product/${product.id}`}
+      to={`/product/${product._id || product.id}`}
       className="tag-notch group block bg-card border border-line rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_-12px_rgba(28,27,25,0.16)] hover:-translate-y-0.5 transition-all duration-200"
     >
-      <div className="relative aspect-[4/5] bg-paper flex items-center justify-center">
+      <div className="relative aspect-[4/5] bg-paper flex items-center justify-center overflow-hidden">
         <button
           onClick={(e) => e.preventDefault()}
           className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-card border border-line flex items-center justify-center hover:text-wine transition-colors shrink-0"
@@ -21,11 +23,20 @@ export default function ProductCard({ product }) {
             {product.tag}
           </span>
         )}
-        <GarmentIcon
-          type={product.type}
-          color={product.color}
-          className="w-2/3 h-2/3 group-hover:scale-105 transition-transform duration-300"
-        />
+        {hasImage ? (
+          <img
+            src={product.images[0]}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        ) : (
+          <GarmentIcon
+            type={product.type}
+            color={product.color}
+            className="w-2/3 h-2/3 group-hover:scale-105 transition-transform duration-300"
+          />
+        )}
       </div>
       <div className="p-3 sm:p-4">
         <p className="font-mono-label text-[10px] sm:text-[11px] uppercase text-muted mb-1 truncate">

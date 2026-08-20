@@ -1,4 +1,11 @@
 import mongoose from "mongoose";
+import dns from "dns";
+
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch (e) {
+  // Ignore fallback errors
+}
 
 export async function connectDB() {
   try {

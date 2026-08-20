@@ -6,8 +6,9 @@ export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
 
   const addItem = (product, size, qty = 1) => {
+    const prodId = product._id || product.id;
     setItems((prev) => {
-      const key = `${product.id}-${size}`;
+      const key = `${prodId}-${size}`;
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         return prev.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i));
@@ -16,7 +17,7 @@ export function CartProvider({ children }) {
         ...prev,
         {
           key,
-          id: product.id,
+          id: prodId,
           name: product.name,
           price: product.price,
           type: product.type,

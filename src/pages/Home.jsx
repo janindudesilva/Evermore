@@ -1,15 +1,53 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ShieldCheck, RefreshCcw, Truck } from "lucide-react";
-import { products, categories } from "../data/products";
+import { ArrowRight, ShieldCheck, RefreshCcw, Truck, Loader2, AlertCircle, Package } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import CategoryPills from "../components/CategoryPills";
 import GarmentIcon from "../components/GarmentIcon";
 
+const categories = ["All", "New Arrivals", "Outerwear", "Essentials", "Featured"];
+
 export default function Home() {
   const [active, setActive] = useState("All");
-  const featuredProduct = products[0];
-  const visible = active === "All" ? products : products.filter((p) => p.category === active);
+  const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchProducts = async (cat = "All") => {
+    try {
+      setLoading(true);
+      setError(null);
+      const query = cat !== "All" ? `?category=${encodeURIComponent(cat)}` : "";
+      const res = await fetch(`/api/products${query}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProducts(data.data);
+        if (cat === "All") {
+          setAllProducts(data.data);
+        }
+      } else {
+        throw new Error(data.message || "Failed to load products");
+      }
+    } catch (err) {
+      console.error("Fetch products error:", err);
+      setError(err.message || "Could not load products. Please check server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts(active);
+  }, [active]);
+
+  const featuredProduct = allProducts[0] || products[0] || {
+    _id: "evermore-field-jacket",
+    name: "Field Jacket",
+    price: 128,
+    type: "jacket",
+    color: "#2C3B2D",
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -48,11 +86,19 @@ export default function Home() {
 
         <div className="relative mt-4 md:mt-0">
           <div className="aspect-square rounded-3xl bg-card border border-line flex items-center justify-center overflow-hidden">
-            <GarmentIcon type={featuredProduct.type} color={featuredProduct.color} className="w-2/3 h-2/3" />
+            {featuredProduct.images && featuredProduct.images.length > 0 ? (
+              <img
+                src={featuredProduct.images[0]}
+                alt={featuredProduct.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <GarmentIcon type={featuredProduct.type || "jacket"} color={featuredProduct.color || "#2C3B2D"} className="w-2/3 h-2/3" />
+            )}
           </div>
           <Link
-            to={`/product/${featuredProduct.id}`}
-            className="absolute bottom-4 left-4 right-4 sm:right-auto bg-card/95 backdrop-blur border border-line rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm hover:-translate-y-0.5 transition-transform"
+            to={`/product/${featuredProduct._id || featuredProduct.id}`}
+            className="absolute bottom-4 left-4 right-4 sm:right-auto bg-card/95 backdrop-blur border border-line rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm hover:-translate-y-0.5 transition-transform z-10"
           >
             <div>
               <p className="text-sm font-medium">{featuredProduct.name}</p>
@@ -67,11 +113,41 @@ export default function Home() {
           <h2 className="font-display text-xl sm:text-2xl font-semibold heading-rule">The Collection</h2>
           <CategoryPills categories={categories} active={active} onChange={setActive} />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
-          {visible.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+
+        {error ? (
+          <div className="bg-wine-soft text-wine border border-wine/20 rounded-2xl p-6 text-center my-6">
+            <AlertCircle size={24} className="mx-auto mb-2" />
+            <p className="font-medium text-sm mb-3">{error}</p>
+            <button
+              onClick={() => fetchProducts(active)}
+              className="px-4 py-1.5 bg-paper text-ink border border-line rounded-full text-xs font-medium hover:border-gold"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div key={n} className="bg-card border border-line rounded-2xl p-4 animate-pulse">
+                <div className="aspect-[4/5] bg-paper/60 rounded-xl mb-3" />
+                <div className="h-3 bg-paper/60 rounded w-2/3 mb-2" />
+                <div className="h-4 bg-paper/60 rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="bg-card border border-line rounded-2xl p-10 text-center my-6">
+            <Package size={32} className="mx-auto mb-3 text-muted" />
+            <p className="font-medium mb-1">No products found</p>
+            <p className="text-sm text-muted">Try selecting a different category.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
+            {products.map((p) => (
+              <ProductCard key={p._id || p.id} product={p} />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
@@ -90,4 +166,3 @@ function Feature({ icon: Icon, title, sub }) {
     </div>
   );
 }
-

@@ -41,11 +41,10 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-orderSchema.pre("validate", function (next) {
+orderSchema.pre("validate", function () {
   if (!this.user && !this.guestInfo) {
-    return next(new Error("Order must have either a user or guestInfo"));
+    throw new Error("Order must have either a user or guestInfo");
   }
-  next();
 });
 
 export default mongoose.model("Order", orderSchema);
