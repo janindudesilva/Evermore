@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, AlertCircle, Package } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import CategoryPills from "../components/CategoryPills";
+import { getProductsApi } from "../utils/api";
 
 const categories = ["All", "New Arrivals", "Outerwear", "Essentials", "Featured"];
 
@@ -16,22 +17,11 @@ export default function Shop() {
     try {
       setLoading(true);
       setError(null);
-      const params = new URLSearchParams();
-      if (cat !== "All") params.append("category", cat);
-      if (query.trim()) params.append("q", query.trim());
-
-      const url = `/api/products${params.toString() ? `?${params.toString()}` : ""}`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        setProducts(data.data);
-      } else {
-        throw new Error(data.message || "Failed to fetch products");
-      }
+      const data = await getProductsApi(cat, query);
+      setProducts(data);
     } catch (err) {
       console.error("Shop fetch error:", err);
-      setError(err.message || "Unable to connect to product service");
+      setError(err.message || "Unable to load product collection.");
     } finally {
       setLoading(false);
     }

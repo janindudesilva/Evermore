@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ShieldCheck, RefreshCcw, Truck, Loader2, AlertCircle, Package } from "lucide-react";
+import { ArrowRight, ShieldCheck, RefreshCcw, Truck, AlertCircle, Package } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import CategoryPills from "../components/CategoryPills";
 import GarmentIcon from "../components/GarmentIcon";
+import { getProductsApi } from "../utils/api";
 
 const categories = ["All", "New Arrivals", "Outerwear", "Essentials", "Featured"];
 
@@ -18,20 +19,14 @@ export default function Home() {
     try {
       setLoading(true);
       setError(null);
-      const query = cat !== "All" ? `?category=${encodeURIComponent(cat)}` : "";
-      const res = await fetch(`/api/products${query}`);
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setProducts(data.data);
-        if (cat === "All") {
-          setAllProducts(data.data);
-        }
-      } else {
-        throw new Error(data.message || "Failed to load products");
+      const data = await getProductsApi(cat);
+      setProducts(data);
+      if (cat === "All") {
+        setAllProducts(data);
       }
     } catch (err) {
-      console.error("Fetch products error:", err);
-      setError(err.message || "Could not load products. Please check server.");
+      console.error("Home fetch error:", err);
+      setError(err.message || "Could not load products.");
     } finally {
       setLoading(false);
     }

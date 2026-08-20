@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Minus, Plus, ShieldCheck, Truck, RefreshCcw, Heart, Star, AlertCircle, Package } from "lucide-react";
 import GarmentIcon from "../components/GarmentIcon";
 import { useCart } from "../context/CartContext";
+import { getProductByIdApi } from "../utils/api";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [selectedImage, setSelectedImage] = useState(0);
   const [size, setSize] = useState("");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -21,15 +23,10 @@ export default function ProductDetail() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/products/${id}`);
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setProduct(data.data);
-        if (data.data.sizes && data.data.sizes.length > 0) {
-          setSize(data.data.sizes[0]);
-        }
-      } else {
-        throw new Error(data.message || "Product not found");
+      const data = await getProductByIdApi(id);
+      setProduct(data);
+      if (data.sizes && data.sizes.length > 0) {
+        setSize(data.sizes[0]);
       }
     } catch (err) {
       console.error("Product detail fetch error:", err);
@@ -85,8 +82,6 @@ export default function ProductDetail() {
       </div>
     );
   }
-
-  const [selectedImage, setSelectedImage] = useState(0);
 
   const hasImages = product.images && product.images.length > 0;
 
