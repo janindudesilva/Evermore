@@ -4,6 +4,7 @@ import { ArrowRight, ShieldCheck, RefreshCcw, Truck, AlertCircle, Package } from
 import ProductCard from "../components/ProductCard";
 import CategoryPills from "../components/CategoryPills";
 import GarmentIcon from "../components/GarmentIcon";
+import JacketVideoScrubber from "../components/JacketVideoScrubber";
 import { getProductsApi } from "../utils/api";
 
 const categories = ["All", "New Arrivals", "Outerwear", "Essentials", "Featured"];
@@ -46,6 +47,7 @@ export default function Home() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      {/* Normal Hero Section Layout */}
       <section className="grid md:grid-cols-2 gap-8 md:gap-10 items-center pt-8 sm:pt-14 pb-12 sm:pb-16">
         <div>
           <span className="inline-flex items-center gap-2 font-mono-label text-xs uppercase bg-card border border-line rounded-full px-3 py-1.5 mb-4 sm:mb-6 text-ink-soft">
@@ -79,27 +81,9 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="relative mt-4 md:mt-0">
-          <div className="aspect-square rounded-3xl bg-card border border-line flex items-center justify-center overflow-hidden">
-            {featuredProduct.images && featuredProduct.images.length > 0 ? (
-              <img
-                src={featuredProduct.images[0]}
-                alt={featuredProduct.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <GarmentIcon type={featuredProduct.type || "jacket"} color={featuredProduct.color || "#2C3B2D"} className="w-2/3 h-2/3" />
-            )}
-          </div>
-          <Link
-            to={`/product/${featuredProduct._id || featuredProduct.id}`}
-            className="absolute bottom-4 left-4 right-4 sm:right-auto bg-card/95 backdrop-blur border border-line rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm hover:-translate-y-0.5 transition-transform z-10"
-          >
-            <div>
-              <p className="text-sm font-medium">{featuredProduct.name}</p>
-              <p className="font-mono-label text-xs text-muted">${featuredProduct.price}</p>
-            </div>
-          </Link>
+        {/* Step 1: JacketVideoScrubber rendered in normal layout spot */}
+        <div className="relative mt-4 md:mt-0 max-w-lg mx-auto w-full">
+          <JacketVideoScrubber product={featuredProduct} />
         </div>
       </section>
 
