@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { RotateCw, MoveHorizontal, ArrowUpRight } from "lucide-react";
+import { RotateCw, MoveHorizontal, ArrowUpRight, Touchpad } from "lucide-react";
 import jacketVideoAsset from "../assets/field-jacket-360.mp4";
 
 export default function JacketVideoScrubber({ product }) {
@@ -12,10 +12,11 @@ export default function JacketVideoScrubber({ product }) {
   const [loadProgress, setLoadProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  const framesRef = useRef([]);       // Array of pre-decoded ImageBitmap frames
+  const framesRef = useRef([]); // Array of pre-decoded ImageBitmap frames
   const totalFramesRef = useRef(0);
   const targetProgressRef = useRef(0);
   const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
   const dragStartProgressRef = useRef(0);
   const isDraggingRef = useRef(false);
 
@@ -48,7 +49,6 @@ export default function JacketVideoScrubber({ product }) {
   };
 
   // Pre-decode ALL video frames into an ImageBitmap array on load
-  // This completely bypasses video.currentTime seeking
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -56,7 +56,6 @@ export default function JacketVideoScrubber({ product }) {
     let cancelled = false;
 
     const extractFrames = async () => {
-      // Wait for video metadata
       await new Promise((resolve) => {
         if (video.readyState >= 1) return resolve();
         video.addEventListener("loadedmetadata", resolve, { once: true });
@@ -65,55 +64,46 @@ export default function JacketVideoScrubber({ product }) {
       const duration = video.duration;
       if (!duration || isNaN(duration)) return;
 
-      // Estimate total frames (assume ~30fps, cap at 200 for safety)
       const fps = 30;
       const estimatedFrames = Math.min(Math.round(duration * fps), 200);
       const frames = [];
 
-      // Create offscreen canvas for frame capture
       const offCanvas = document.createElement("canvas");
       const offCtx = offCanvas.getContext("2d");
 
-      // Wait for enough data to seek
       await new Promise((resolve) => {
         if (video.readyState >= 2) return resolve();
         video.addEventListener("canplay", resolve, { once: true });
       });
 
-      // iOS Safari unlock: play then immediately pause
       try {
         await video.play();
         video.pause();
       } catch (e) {
-        // Autoplay blocked, that's fine — we just need it paused
+        // Autoplay policy fallback
       }
 
-      // Extract each frame by seeking to it
       for (let i = 0; i < estimatedFrames; i++) {
         if (cancelled) return;
 
         const time = (i / estimatedFrames) * duration;
-
-        // Seek and wait for the frame to actually decode
         video.currentTime = time;
+
         await new Promise((resolve) => {
           video.addEventListener("seeked", resolve, { once: true });
         });
 
-        // Set canvas size on first frame
         if (i === 0) {
           offCanvas.width = video.videoWidth;
           offCanvas.height = video.videoHeight;
         }
 
-        // Capture the decoded frame
         offCtx.drawImage(video, 0, 0, offCanvas.width, offCanvas.height);
 
         try {
           const bitmap = await createImageBitmap(offCanvas);
           frames.push(bitmap);
         } catch (e) {
-          // Fallback: store as ImageData
           const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
           frames.push(imgData);
         }
@@ -127,7 +117,6 @@ export default function JacketVideoScrubber({ product }) {
       totalFramesRef.current = frames.length;
       setIsLoaded(true);
 
-      // Draw the first frame immediately
       drawFrameIndex(0);
     };
 
@@ -140,7 +129,7 @@ export default function JacketVideoScrubber({ product }) {
     };
   }, []);
 
-  // Wheel handler: updates target progress, draws from pre-decoded frames
+  // Wheel handler for desktop box scrolling
   useEffect(() => {
     const box = boxRef.current;
     if (!box) return;
@@ -149,7 +138,7 @@ export default function JacketVideoScrubber({ product }) {
       e.preventDefault();
       e.stopPropagation();
 
-      const delta = e.deltaY * 0.0003; // Much slower rotation
+      const delta = e.deltaY * 0.0004; // Smooth tuned scroll sensitivity
       targetProgressRef.current += delta;
 
       let wrapped = targetProgressRef.current % 1;
@@ -158,7 +147,6 @@ export default function JacketVideoScrubber({ product }) {
 
       setScrollProgress(wrapped);
 
-      // Draw from pre-decoded frames array — instant, no seeking
       const totalFrames = totalFramesRef.current;
       if (totalFrames > 0) {
         const frameIndex = Math.round(wrapped * (totalFrames - 1));
@@ -170,7 +158,7 @@ export default function JacketVideoScrubber({ product }) {
     return () => box.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // Mobile touch & mouse drag support
+  // Mobile touch & mouse drag support optimized for touch screens
   const handlePointerDown = (e) => {
     isDraggingRef.current = true;
     const clientX =
@@ -179,7 +167,15 @@ export default function JacketVideoScrubber({ product }) {
         : e.touches && e.touches[0]
         ? e.touches[0].clientX
         : 0;
+    const clientY =
+      e.clientY !== undefined
+        ? e.clientY
+        : e.touches && e.touches[0]
+        ? e.touches[0].clientY
+        : 0;
+
     dragStartXRef.current = clientX;
+    dragStartYRef.current = clientY;
     dragStartProgressRef.current = targetProgressRef.current;
   };
 
@@ -188,20 +184,30 @@ export default function JacketVideoScrubber({ product }) {
     const box = boxRef.current;
     if (!box) return;
 
-    if (e.touches) {
-      e.preventDefault();
-    }
-
     const clientX =
       e.clientX !== undefined
         ? e.clientX
         : e.touches && e.touches[0]
         ? e.touches[0].clientX
         : 0;
-    const deltaX = clientX - dragStartXRef.current;
-    const boxWidth = box.offsetWidth || 400;
+    const clientY =
+      e.clientY !== undefined
+        ? e.clientY
+        : e.touches && e.touches[0]
+        ? e.touches[0].clientY
+        : 0;
 
-    const deltaProgress = -deltaX / (boxWidth * 0.6);
+    const deltaX = clientX - dragStartXRef.current;
+    const deltaY = clientY - dragStartYRef.current;
+
+    // Prevent page scroll only when touch gesture is predominantly horizontal
+    if (e.touches && Math.abs(deltaX) > Math.abs(deltaY)) {
+      e.preventDefault();
+    }
+
+    const boxWidth = box.offsetWidth || 350;
+    // Mobile responsive drag sensitivity
+    const deltaProgress = -deltaX / (boxWidth * 0.8);
     let wrapped = (dragStartProgressRef.current + deltaProgress) % 1;
     if (wrapped < 0) wrapped += 1;
 
@@ -236,7 +242,7 @@ export default function JacketVideoScrubber({ product }) {
   return (
     <div
       ref={boxRef}
-      className="relative w-full aspect-square rounded-3xl bg-black border border-gold/30 flex flex-col items-center justify-center overflow-hidden shadow-2xl group select-none transition-all duration-300 hover:border-gold/60 cursor-grab active:cursor-grabbing"
+      className="relative w-full aspect-square rounded-2xl sm:rounded-3xl bg-black border border-gold/30 flex flex-col items-center justify-center overflow-hidden shadow-2xl group select-none transition-all duration-300 hover:border-gold/60 cursor-grab active:cursor-grabbing"
       onMouseDown={handlePointerDown}
       onMouseMove={handlePointerMove}
       onMouseUp={handlePointerUp}
@@ -244,19 +250,21 @@ export default function JacketVideoScrubber({ product }) {
       onTouchMove={handlePointerMove}
       onTouchEnd={handlePointerUp}
     >
-      {/* Top Header Bar */}
-      <div className="absolute top-3.5 left-3.5 right-3.5 z-30 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/15 rounded-full px-3 py-1.5 shadow-lg text-xs font-mono-label text-white">
-          <RotateCw size={13} className="text-gold animate-spin-slow" />
-          <span className="tracking-wide">360° Interactive</span>
+      {/* Top Header Bar - Optimized for Mobile & Desktop */}
+      <div className="absolute top-2.5 sm:top-3.5 left-2.5 sm:left-3.5 right-2.5 sm:right-3.5 z-30 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-black/75 backdrop-blur-md border border-white/15 rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-lg text-[11px] sm:text-xs font-mono-label text-white">
+          <RotateCw size={12} className="text-gold animate-spin-slow shrink-0" />
+          <span className="tracking-wide hidden sm:inline">360° Interactive</span>
+          <span className="tracking-wide sm:hidden">360° View</span>
           <span className="bg-gold/20 text-gold font-semibold px-1.5 py-0.5 rounded text-[10px]">
             {`${degrees}°`}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/15 text-white text-[11px] px-3 py-1.5 rounded-full font-mono-label shadow opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <MoveHorizontal size={12} className="text-gold" />
-          <span>Hover & Scroll</span>
+        <div className="flex items-center gap-1.5 bg-black/75 sm:bg-white/10 backdrop-blur-md border border-white/15 text-white text-[10px] sm:text-[11px] px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-mono-label shadow">
+          <MoveHorizontal size={11} className="text-gold shrink-0" />
+          <span className="sm:hidden">Swipe / Scroll</span>
+          <span className="hidden sm:inline">Hover & Scroll</span>
         </div>
       </div>
 
@@ -287,12 +295,12 @@ export default function JacketVideoScrubber({ product }) {
 
         {!isLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-xs z-10">
-            <div className="flex flex-col items-center gap-3">
-              <RotateCw size={20} className="animate-spin text-gold" />
+            <div className="flex flex-col items-center gap-2.5">
+              <RotateCw size={18} className="animate-spin text-gold" />
               <span className="text-xs font-mono-label text-gold">
-                Loading 360° frames...
+                Loading 360° model...
               </span>
-              <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="w-28 sm:w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-gold via-amber-300 to-gold rounded-full transition-all duration-150"
                   style={{ width: `${loadProgress}%` }}
@@ -306,11 +314,11 @@ export default function JacketVideoScrubber({ product }) {
         )}
       </div>
 
-      {/* Bottom Info Glass Card */}
-      <div className="absolute bottom-3.5 left-3.5 right-3.5 z-30 pointer-events-auto">
+      {/* Bottom Info Glass Card - Mobile Optimized Padding & Layout */}
+      <div className="absolute bottom-2.5 sm:bottom-3.5 left-2.5 sm:left-3.5 right-2.5 sm:right-3.5 z-30 pointer-events-auto">
         <Link
           to={`/product/${productData._id || productData.id}`}
-          className="group/btn block bg-black/80 backdrop-blur-xl border border-white/15 hover:border-gold/50 rounded-2xl overflow-hidden shadow-2xl transition-all duration-200"
+          className="group/btn block bg-black/85 backdrop-blur-xl border border-white/15 hover:border-gold/50 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl transition-all duration-200"
         >
           <div className="w-full h-1 bg-white/10 overflow-hidden">
             <div
@@ -319,22 +327,24 @@ export default function JacketVideoScrubber({ product }) {
             />
           </div>
 
-          <div className="px-4 py-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-white leading-tight">{productData.name}</p>
-                <span className="font-mono-label text-[10px] uppercase bg-gold/20 text-gold px-1.5 py-0.5 rounded">
+          <div className="px-3 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <p className="text-xs sm:text-sm font-semibold text-white truncate leading-tight">
+                  {productData.name}
+                </p>
+                <span className="font-mono-label text-[9px] sm:text-[10px] uppercase bg-gold/20 text-gold px-1.5 py-0.5 rounded shrink-0">
                   3D View
                 </span>
               </div>
-              <p className="font-mono-label text-xs text-white/70 leading-tight mt-0.5">
+              <p className="font-mono-label text-[11px] sm:text-xs text-white/70 leading-tight mt-0.5">
                 ${productData.price} USD
               </p>
             </div>
 
-            <div className="flex items-center gap-1 text-xs font-mono-label text-gold font-medium bg-gold/10 group-hover/btn:bg-gold group-hover/btn:text-black px-3 py-1.5 rounded-full transition-all duration-200">
-              <span>View Details</span>
-              <ArrowUpRight size={13} />
+            <div className="flex items-center gap-1 text-[11px] sm:text-xs font-mono-label text-gold font-medium bg-gold/10 group-hover/btn:bg-gold group-hover/btn:text-black px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full transition-all duration-200 shrink-0">
+              <span>View</span>
+              <ArrowUpRight size={12} />
             </div>
           </div>
         </Link>
