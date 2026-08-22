@@ -282,7 +282,7 @@ export default function JacketVideoScrubber({ product }) {
             pointerEvents: "none",
           }}
         >
-          <source src="/assets/field-jacket-360.mp4" type="video/mp4" />
+          <source src={jacketVideoAsset} type="video/mp4" />
         </video>
 
         {!isLoaded && (
