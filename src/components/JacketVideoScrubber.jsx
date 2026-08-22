@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { RotateCw, MoveHorizontal, ArrowUpRight } from "lucide-react";
+import jacketVideoAsset from "../assets/field-jacket-360.mp4";
 
 export default function JacketVideoScrubber({ product }) {
   const boxRef = useRef(null);
