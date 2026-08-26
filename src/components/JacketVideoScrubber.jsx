@@ -1,19 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { RotateCw, MoveHorizontal, ArrowUpRight, Touchpad } from "lucide-react";
-import jacketVideoAsset from "../assets/field-jacket-360.mp4";
+import { RotateCw, MoveHorizontal, ArrowUpRight } from "lucide-react";
+
+const TOTAL_FRAMES = 112;
 
 export default function JacketVideoScrubber({ product }) {
   const boxRef = useRef(null);
-  const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const framesRef = useRef([]);
 
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [framesLoaded, setFramesLoaded] = useState(false);
   const [loadProgress, setLoadProgress] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
 
-  const framesRef = useRef([]); // Array of pre-decoded ImageBitmap frames
-  const totalFramesRef = useRef(0);
   const targetProgressRef = useRef(0);
   const dragStartXRef = useRef(0);
   const dragStartYRef = useRef(0);
@@ -27,107 +26,79 @@ export default function JacketVideoScrubber({ product }) {
     price: 128,
   };
 
-  // Draw a specific frame index to the visible canvas
-  const drawFrameIndex = (index) => {
-    const canvas = canvasRef.current;
-    const frames = framesRef.current;
-    if (!canvas || !frames.length) return;
+  // Step 2: Preload every frame image into memory on mount
+  useEffect(() => {
+    let loadedCount = 0;
+    const images = [];
 
-    const safeIndex = Math.max(0, Math.min(index, frames.length - 1));
-    const frame = frames[safeIndex];
-    if (!frame) return;
+    for (let i = 1; i <= TOTAL_FRAMES; i++) {
+      const img = new Image();
+      const num = String(i).padStart(3, "0");
+      img.src = `/assets/field-jacket-frames/frame_${num}.jpg`;
+
+      img.onload = () => {
+        loadedCount++;
+        setLoadProgress(Math.round((loadedCount / TOTAL_FRAMES) * 100));
+        if (loadedCount === TOTAL_FRAMES) {
+          setFramesLoaded(true);
+        }
+      };
+
+      img.onerror = () => {
+        // Fallback progress if an image fails
+        loadedCount++;
+        setLoadProgress(Math.round((loadedCount / TOTAL_FRAMES) * 100));
+        if (loadedCount === TOTAL_FRAMES) {
+          setFramesLoaded(true);
+        }
+      };
+
+      images.push(img);
+    }
+
+    framesRef.current = images;
+  }, []);
+
+  // Step 3: Draw current frame to canvas (instant, zero seek lag)
+  const drawFrame = (index) => {
+    const canvas = canvasRef.current;
+    const img = framesRef.current[index];
+    if (!canvas || !img || !img.complete) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    if (canvas.width !== frame.width || canvas.height !== frame.height) {
-      canvas.width = frame.width;
-      canvas.height = frame.height;
+    if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
     }
 
-    ctx.drawImage(frame, 0, 0);
+    ctx.drawImage(img, 0, 0);
   };
 
-  // Pre-decode ALL video frames into an ImageBitmap array on load
+  // Step 4: Animation loop for ultra-smooth rendering
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    let cancelled = false;
-
-    const extractFrames = async () => {
-      await new Promise((resolve) => {
-        if (video.readyState >= 1) return resolve();
-        video.addEventListener("loadedmetadata", resolve, { once: true });
-      });
-
-      const duration = video.duration;
-      if (!duration || isNaN(duration)) return;
-
-      const fps = 30;
-      const estimatedFrames = Math.min(Math.round(duration * fps), 200);
-      const frames = [];
-
-      const offCanvas = document.createElement("canvas");
-      const offCtx = offCanvas.getContext("2d");
-
-      await new Promise((resolve) => {
-        if (video.readyState >= 2) return resolve();
-        video.addEventListener("canplay", resolve, { once: true });
-      });
-
-      try {
-        await video.play();
-        video.pause();
-      } catch (e) {
-        // Autoplay policy fallback
+    let animId;
+    const tick = () => {
+      if (framesLoaded) {
+        let wrapped = targetProgressRef.current % 1;
+        if (wrapped < 0) wrapped += 1;
+        const frameIndex = Math.floor(wrapped * TOTAL_FRAMES) % TOTAL_FRAMES;
+        drawFrame(frameIndex);
       }
-
-      for (let i = 0; i < estimatedFrames; i++) {
-        if (cancelled) return;
-
-        const time = (i / estimatedFrames) * duration;
-        video.currentTime = time;
-
-        await new Promise((resolve) => {
-          video.addEventListener("seeked", resolve, { once: true });
-        });
-
-        if (i === 0) {
-          offCanvas.width = video.videoWidth;
-          offCanvas.height = video.videoHeight;
-        }
-
-        offCtx.drawImage(video, 0, 0, offCanvas.width, offCanvas.height);
-
-        try {
-          const bitmap = await createImageBitmap(offCanvas);
-          frames.push(bitmap);
-        } catch (e) {
-          const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
-          frames.push(imgData);
-        }
-
-        setLoadProgress(Math.round(((i + 1) / estimatedFrames) * 100));
-      }
-
-      if (cancelled) return;
-
-      framesRef.current = frames;
-      totalFramesRef.current = frames.length;
-      setIsLoaded(true);
-
-      drawFrameIndex(0);
+      animId = requestAnimationFrame(tick);
     };
 
-    extractFrames().catch((err) => {
-      console.error("Frame extraction failed:", err);
-    });
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [framesLoaded]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Initial draw when all frames complete loading
+  useEffect(() => {
+    if (framesLoaded) {
+      drawFrame(0);
+    }
+  }, [framesLoaded]);
 
   // Wheel handler for desktop box scrolling
   useEffect(() => {
@@ -143,22 +114,15 @@ export default function JacketVideoScrubber({ product }) {
 
       let wrapped = targetProgressRef.current % 1;
       if (wrapped < 0) wrapped += 1;
-      targetProgressRef.current = wrapped;
 
       setScrollProgress(wrapped);
-
-      const totalFrames = totalFramesRef.current;
-      if (totalFrames > 0) {
-        const frameIndex = Math.round(wrapped * (totalFrames - 1));
-        drawFrameIndex(frameIndex);
-      }
     };
 
     box.addEventListener("wheel", handleWheel, { passive: false });
     return () => box.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // Mobile touch & mouse drag support optimized for touch screens
+  // Mobile touch & mouse drag support
   const handlePointerDown = (e) => {
     isDraggingRef.current = true;
     const clientX =
@@ -206,19 +170,12 @@ export default function JacketVideoScrubber({ product }) {
     }
 
     const boxWidth = box.offsetWidth || 350;
-    // Mobile responsive drag sensitivity
     const deltaProgress = -deltaX / (boxWidth * 0.8);
     let wrapped = (dragStartProgressRef.current + deltaProgress) % 1;
     if (wrapped < 0) wrapped += 1;
 
     targetProgressRef.current = wrapped;
     setScrollProgress(wrapped);
-
-    const totalFrames = totalFramesRef.current;
-    if (totalFrames > 0) {
-      const frameIndex = Math.round(wrapped * (totalFrames - 1));
-      drawFrameIndex(frameIndex);
-    }
   };
 
   const handlePointerUp = () => {
@@ -250,7 +207,7 @@ export default function JacketVideoScrubber({ product }) {
       onTouchMove={handlePointerMove}
       onTouchEnd={handlePointerUp}
     >
-      {/* Top Header Bar - Optimized for Mobile & Desktop */}
+      {/* Top Header Bar */}
       <div className="absolute top-2.5 sm:top-3.5 left-2.5 sm:left-3.5 right-2.5 sm:right-3.5 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-1.5 sm:gap-2 bg-black/75 backdrop-blur-md border border-white/15 rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-lg text-[11px] sm:text-xs font-mono-label text-white">
           <RotateCw size={12} className="text-gold animate-spin-slow shrink-0" />
@@ -268,32 +225,14 @@ export default function JacketVideoScrubber({ product }) {
         </div>
       </div>
 
-      {/* Canvas Frame Display */}
+      {/* Step 5: Canvas Display & Loading State (No Video Element) */}
       <div className="w-full h-full flex items-center justify-center bg-black relative">
         <canvas
           ref={canvasRef}
           className="w-full h-full object-contain pointer-events-none transition-transform duration-300 group-hover:scale-105"
         />
 
-        {/* Hidden video element for frame extraction only */}
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          preload="auto"
-          crossOrigin="anonymous"
-          style={{
-            position: "absolute",
-            width: "1px",
-            height: "1px",
-            opacity: 0,
-            pointerEvents: "none",
-          }}
-        >
-          <source src={jacketVideoAsset} type="video/mp4" />
-        </video>
-
-        {!isLoaded && (
+        {!framesLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-xs z-10">
             <div className="flex flex-col items-center gap-2.5">
               <RotateCw size={18} className="animate-spin text-gold" />
@@ -314,7 +253,7 @@ export default function JacketVideoScrubber({ product }) {
         )}
       </div>
 
-      {/* Bottom Info Glass Card - Mobile Optimized Padding & Layout */}
+      {/* Bottom Info Glass Card */}
       <div className="absolute bottom-2.5 sm:bottom-3.5 left-2.5 sm:left-3.5 right-2.5 sm:right-3.5 z-30 pointer-events-auto">
         <Link
           to={`/product/${productData._id || productData.id}`}
