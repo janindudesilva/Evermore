@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, AlertCircle, Package } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import CategoryPills from "../components/CategoryPills";
@@ -9,27 +9,60 @@ const categories = ["All", "New Arrivals", "Outerwear", "Essentials", "Featured"
 export default function Shop() {
   const [active, setActive] = useState("All");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchProducts = async (cat = active, query = search) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getProductsApi(cat, query);
-      setProducts(data);
-    } catch (err) {
-      console.error("Shop fetch error:", err);
-      setError(err.message || "Unable to load product collection.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const requestIdRef = useRef(0);
 
+  // Debounce search input by 300ms (E-18)
   useEffect(() => {
-    fetchProducts(active, search);
-  }, [active, search]);
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Fetch products with stale-response protection
+  useEffect(() => {
+    const currentRequestId = ++requestIdRef.current;
+
+    async function loadProducts() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getProductsApi(active, debouncedSearch);
+
+        // Ignore stale response if another request has been initiated
+        if (currentRequestId === requestIdRef.current) {
+          setProducts(data);
+        }
+      } catch (err) {
+        if (currentRequestId === requestIdRef.current) {
+          console.error("Shop fetch error:", err);
+          setError(err.message || "Unable to load product collection.");
+        }
+      } finally {
+        if (currentRequestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProducts();
+  }, [active, debouncedSearch]);
+
+  const handleRetry = () => {
+    requestIdRef.current++;
+    setLoading(true);
+    setError(null);
+    getProductsApi(active, debouncedSearch)
+      .then((data) => setProducts(data))
+      .catch((err) => setError(err.message || "Unable to load product collection."))
+      .finally(() => setLoading(false));
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-16 sm:pb-24">
@@ -62,8 +95,8 @@ export default function Shop() {
           <AlertCircle size={24} className="mx-auto mb-2" />
           <p className="font-medium text-sm mb-3">{error}</p>
           <button
-            onClick={() => fetchProducts(active, search)}
-            className="px-4 py-1.5 bg-paper text-ink border border-line rounded-full text-xs font-medium hover:border-gold"
+            onClick={handleRetry}
+            className="px-4 py-1.5 bg-paper text-ink border border-line rounded-full text-xs font-medium hover:border-gold transition-colors"
           >
             Retry
           </button>
@@ -81,7 +114,7 @@ export default function Shop() {
       ) : products.length === 0 ? (
         <div className="bg-card border border-line rounded-2xl p-12 text-center my-6">
           <Package size={36} className="mx-auto mb-3 text-muted" />
-          <h3 className="font-display text-lg font-medium mb-1">No products found</h3>
+          <h3 className="font-display text-lg font-medium mb-1">No garments found</h3>
           <p className="text-sm text-muted max-w-sm mx-auto">
             We couldn't find any products matching your selected category or search term.
           </p>

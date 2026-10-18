@@ -1,58 +1,63 @@
-# LOOM API
+# EVERMORE API
 
-Express + MongoDB backend for the LOOM clothing store frontend.
+Express 5 + MongoDB backend for the **EVERMORE** clothing brand e-commerce platform.
 
-## Setup
+## Configuration & Environment Variables
 
-```
+Create `.env` in `Backend/` based on `.env.example`:
+
+| Variable | Description | Example / Default |
+|---|---|---|
+| `PORT` | API listening port | `5000` |
+| `MONGO_URI` | MongoDB connection URI | `mongodb://localhost:27017/evermore` |
+| `JWT_SECRET` | Secret key for signing JSON Web Tokens | Long random 64-character hex string |
+| `CORS_ORIGIN` | Comma-separated list of allowed frontend origins | `http://localhost:5173,http://localhost:3000` |
+| `ALLOW_SEED_OVERWRITE` | Safety flag to allow clearing products during seed | `false` |
+| `ADMIN_EMAIL` | Default administrator account email for seed | `admin@theevermore.com` |
+| `ADMIN_INITIAL_PASSWORD` | Administrator initial password for seed | Secure custom passphrase |
+
+## Setup & Running
+
+```bash
+# Install dependencies
 npm install
-cp .env.example .env
+
+# Seed catalog & admin safely (non-destructive if DB populated)
+npm run seed
+
+# Run in development mode with nodemon
+npm run dev
+
+# Run in production mode
+npm start
 ```
 
-Edit `.env`:
-- `MONGO_URI` — local MongoDB (`mongodb://localhost:27017/loom`) or a MongoDB Atlas connection string
-- `JWT_SECRET` — any long random string
+## API Specification
 
-## Run
+### 1. Authentication (`/api/auth`)
+- `POST /api/auth/register` — Register a customer account (rate limited)
+- `POST /api/auth/login` — Sign in and obtain JWT (rate limited)
+- `GET /api/auth/me` — Current authenticated user profile
+- `PUT /api/auth/profile` — Update account profile (name, phone, delivery address)
 
-```
-npm run seed   # loads the product catalog + an admin user (admin@loom.com / admin123)
-npm run dev    # starts the API on http://localhost:5000 with nodemon
-```
+### 2. Product Catalog (`/api/products`)
+- `GET /api/products?category=...&q=...&page=1&limit=24` — Paginated product catalog
+- `GET /api/products/:id` — Single product details with size and stock information
+- `POST /api/products` — Admin only: Create new garment with sizes & stock
+- `PUT /api/products/:id` — Admin only: Update garment attributes
+- `DELETE /api/products/:id` — Admin only: Deactivate product
 
-## Endpoints
+### 3. Orders & Checkout (`/api/orders`)
+- `POST /api/orders` — Create order (rate limited, supports guests and authenticated customers). Atomic inventory reservation per size.
+- `GET /api/orders/mine` — Customer order history with pagination
+- `GET /api/orders/:id` — View specific order details
+- `POST /api/orders/:id/cancel` — Customer order cancellation (for pending orders only, restores stock)
+- `GET /api/orders` — Admin only: Paginated list of all customer orders
+- `PUT /api/orders/:id/status` — Admin only: Order state transition with state machine enforcement
 
-| Method | Route                     | Access          | Notes                                  |
-|--------|---------------------------|-----------------|-----------------------------------------|
-| POST   | /api/auth/register        | Public          | Creates a customer account              |
-| POST   | /api/auth/login           | Public          | Returns `{ user, token }`               |
-| GET    | /api/auth/me              | Account         | Requires `Authorization: Bearer <token>`|
-| GET    | /api/products             | Public          | `?category=` and `?q=` filters          |
-| GET    | /api/products/:id         | Public          |                                          |
-| POST   | /api/products             | Admin           |                                          |
-| PUT    | /api/products/:id         | Admin           |                                          |
-| DELETE | /api/products/:id         | Admin           |                                          |
-| POST   | /api/orders               | Guest or Account| See below                               |
-| GET    | /api/orders/mine          | Account         | Order history                           |
-| GET    | /api/orders               | Admin           | All orders                              |
-| PUT    | /api/orders/:id/status    | Admin           | Update order status                     |
+### 4. Inquiries & Newsletter (`/api/inquiries`)
+- `POST /api/inquiries/contact` — Customer contact inquiry (rate limited)
+- `POST /api/inquiries/newsletter` — Mailing list signup (rate limited)
 
-### Guest vs. account checkout
-
-`POST /api/orders` works both ways:
-- **Logged in:** send the JWT in the `Authorization` header; omit `guestInfo`. The order is linked to `user`.
-- **Guest:** omit the `Authorization` header; include `guestInfo: { name, email, phone, address, city, postalCode }`. The order is stored with `guestInfo` and no `user`.
-
-Request body shape:
-```json
-{
-  "items": [{ "productId": "...", "size": "M", "qty": 1 }],
-  "guestInfo": { "name": "...", "email": "...", "phone": "...", "address": "...", "city": "...", "postalCode": "..." }
-}
-```
-
-Prices are always re-fetched from the database server-side — the client never dictates the price charged.
-
-## Wiring up the React frontend
-
-In `AuthContext.jsx`, replace the mock `login`/`register` with real calls to `/api/auth/login` and `/api/auth/register`, storing the returned `token` (e.g. in memory or `localStorage`, matching the BizExchange convention). In `Checkout.jsx`, POST to `/api/orders` with the cart items and either the stored token or the guest form fields.
+### 5. Health Check
+- `GET /api/health` — Returns status, database connection, and timestamp

@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { fetchJson } from "../utils/api";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { fetchJson, apiFetch } from "../utils/api";
 
 const AuthContext = createContext(null);
 
@@ -18,12 +18,8 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const data = await fetchJson("/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
-        });
-        if (data.success) {
+        const data = await fetchJson("/api/auth/me");
+        if (data && data.success && data.data) {
           setUser(data.data);
           setToken(storedToken);
         } else {
@@ -32,7 +28,7 @@ export function AuthProvider({ children }) {
           setToken(null);
         }
       } catch (err) {
-        console.warn("Auth check failed:", err.message);
+        console.warn("Auth session validation failed:", err.message);
         localStorage.removeItem("token");
         setUser(null);
         setToken(null);
@@ -45,80 +41,75 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    try {
-      const data = await fetchJson("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+    const data = await fetchJson("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
 
-      const { user: userData, token: jwtToken } = data.data;
-      localStorage.setItem("token", jwtToken);
-      setToken(jwtToken);
-      setUser(userData);
-      return userData;
-    } catch (err) {
-      if (err.message.includes("HTML")) {
-        // Fallback for previewing UI without backend
-        const isAdmin = email.startsWith("admin");
-        const mockUser = {
-          _id: "mock-user-1",
-          name: isAdmin ? "Admin" : email.split("@")[0],
-          email,
-          role: isAdmin ? "admin" : "customer",
-        };
-        setUser(mockUser);
-        return mockUser;
-      }
-      throw err;
-    }
+    const { user: userData, token: jwtToken } = data.data;
+    localStorage.setItem("token", jwtToken);
+    setToken(jwtToken);
+    setUser(userData);
+    return userData;
   };
 
   const register = async (name, email, password) => {
-    try {
-      const data = await fetchJson("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
+    const data = await fetchJson("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password }),
+    });
 
-      const { user: userData, token: jwtToken } = data.data;
-      localStorage.setItem("token", jwtToken);
-      setToken(jwtToken);
-      setUser(userData);
-      return userData;
-    } catch (err) {
-      if (err.message.includes("HTML")) {
-        const mockUser = { _id: `user-${Date.now()}`, name, email, role: "customer" };
-        setUser(mockUser);
-        return mockUser;
-      }
-      throw err;
-    }
+    const { user: userData, token: jwtToken } = data.data;
+    localStorage.setItem("token", jwtToken);
+    setToken(jwtToken);
+    setUser(userData);
+    return userData;
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const authFetch = (url, options = {}) => {
-    const headers = {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+  // Centralized authFetch respecting VITE_API_URL
+  const authFetch = useCallback((url, options = {}) => {
+    return apiFetch(url, options);
+  }, []);
+
+  const updateProfile = async (profileData) => {
+    const res = await fetchJson("/api/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify(profileData),
+    });
+    if (res.success && res.data) {
+      setUser(res.data);
     }
-    return fetch(url, { ...options, headers });
+    return res.data;
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, authFetch }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        logout,
+        authFetch,
+        updateProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

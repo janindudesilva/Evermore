@@ -1,0 +1,14 @@
+# robots.txt for THE EVERMORE
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /product/*
+Allow: /about
+Allow: /contact
+
+Disallow: /admin
+Disallow: /account
+Disallow: /checkout
+Disallow: /api/
+
+Sitemap: https://theevermore.com/sitemap.xml

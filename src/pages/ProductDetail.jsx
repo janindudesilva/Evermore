@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Minus, Plus, ShieldCheck, Truck, RefreshCcw, Heart, Star, AlertCircle, Package } from "lucide-react";
+import { ArrowLeft, Check, Minus, Plus, ShieldCheck, Truck, RefreshCcw, Heart, Star, AlertCircle } from "lucide-react";
 import GarmentIcon from "../components/GarmentIcon";
 import { useCart } from "../context/CartContext";
 import { getProductByIdApi } from "../utils/api";
@@ -17,16 +17,51 @@ export default function ProductDetail() {
   const [size, setSize] = useState("");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
   const { addItem } = useCart();
 
-  const fetchProduct = async () => {
+  // Wishlist initialization
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("evermore_wishlist") || "[]");
+      if (Array.isArray(saved) && id) {
+        setIsWishlisted(saved.includes(id));
+      }
+    } catch (e) {
+      // Ignore JSON error
+    }
+  }, [id]);
+
+  const toggleWishlist = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("evermore_wishlist") || "[]");
+      let updated;
+      if (saved.includes(id)) {
+        updated = saved.filter((item) => item !== id);
+        setIsWishlisted(false);
+      } else {
+        updated = [...saved, id];
+        setIsWishlisted(true);
+      }
+      localStorage.setItem("evermore_wishlist", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Wishlist toggle error:", e);
+    }
+  };
+
+  const fetchProduct = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await getProductByIdApi(id);
       setProduct(data);
       if (data.sizes && data.sizes.length > 0) {
-        setSize(data.sizes[0]);
+        // Default to first size with stock if possible
+        const inStockSize = data.sizes.find((s) => {
+          const stk = data.stock ? (data.stock[s] ?? 10) : 10;
+          return stk > 0;
+        });
+        setSize(inStockSize || data.sizes[0]);
       }
     } catch (err) {
       console.error("Product detail fetch error:", err);
@@ -34,14 +69,23 @@ export default function ProductDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchProduct();
-  }, [id]);
+  }, [fetchProduct]);
+
+  // Derive available stock for currently selected size
+  const stockForSelectedSize = product?.stock
+    ? (product.stock[size] !== undefined ? product.stock[size] : 10)
+    : 10;
+  const isOutOfStock = stockForSelectedSize <= 0;
+
+  // Keep quantity within stock bounds (E-17)
+  const maxAllowedQty = Math.max(1, Math.min(stockForSelectedSize, 10));
 
   const handleAdd = () => {
-    if (!product) return;
+    if (!product || isOutOfStock) return;
     addItem(product, size, qty);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
@@ -70,11 +114,11 @@ export default function ProductDetail() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-24 text-center">
         <div className="bg-card border border-line rounded-3xl p-10 max-w-md mx-auto">
           <AlertCircle size={36} className="mx-auto mb-3 text-wine" />
-          <h2 className="font-display text-2xl font-semibold mb-2">Product Not Found</h2>
-          <p className="text-sm text-muted mb-6">{error || "The product you are looking for does not exist."}</p>
+          <h2 className="font-display text-2xl font-semibold mb-2">Garment Not Found</h2>
+          <p className="text-sm text-muted mb-6">{error || "The garment you are looking for does not exist in our catalog."}</p>
           <button
             onClick={() => navigate("/shop")}
-            className="inline-flex items-center gap-2 bg-moss text-paper px-5 py-2.5 rounded-full text-sm font-medium hover:bg-moss/90"
+            className="inline-flex items-center gap-2 bg-moss text-paper px-5 py-2.5 rounded-full text-sm font-medium hover:bg-moss/90 transition-colors"
           >
             <ArrowLeft size={15} /> Back to Shop
           </button>
@@ -180,54 +224,98 @@ export default function ProductDetail() {
             </ul>
           )}
 
+          {/* Size Selection with Stock Status (E-17) */}
           {product.sizes && product.sizes.length > 0 && (
             <div className="mb-6">
-              <p className="text-sm font-medium mb-2">Size</p>
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm font-medium">Select Size</p>
+                <span className="text-xs text-muted font-mono-label">
+                  {isOutOfStock ? (
+                    <span className="text-wine font-medium">Out of stock</span>
+                  ) : (
+                    <span>{stockForSelectedSize} in stock</span>
+                  )}
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
-                {product.sizes.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSize(s)}
-                    className={`w-10 sm:w-11 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-mono-label border transition-colors ${
-                      size === s ? "bg-moss text-paper border-moss" : "border-line hover:border-gold/50"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {product.sizes.map((s) => {
+                  const sStock = product.stock ? (product.stock[s] !== undefined ? product.stock[s] : 10) : 10;
+                  const isSzOut = sStock <= 0;
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setSize(s);
+                        setQty(1);
+                      }}
+                      className={`min-w-10 sm:min-w-11 h-10 sm:h-11 px-3 rounded-full text-xs sm:text-sm font-mono-label border transition-colors ${
+                        size === s
+                          ? "bg-moss text-paper border-moss"
+                          : isSzOut
+                          ? "border-line text-muted opacity-40 line-through"
+                          : "border-line hover:border-gold/50"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
+          {/* Stock-Constrained Quantity Selector (E-17) */}
           <div className="flex items-center gap-4 mb-6">
             <p className="text-sm font-medium">Quantity</p>
             <div className="flex items-center gap-3 bg-card border border-line rounded-full px-3 py-1.5">
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="p-0.5">
+              <button
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                disabled={qty <= 1 || isOutOfStock}
+                className="p-0.5 disabled:opacity-30"
+              >
                 <Minus size={14} />
               </button>
               <span className="font-mono-label w-4 text-center">{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="p-0.5">
+              <button
+                onClick={() => setQty((q) => Math.min(maxAllowedQty, q + 1))}
+                disabled={qty >= maxAllowedQty || isOutOfStock}
+                className="p-0.5 disabled:opacity-30"
+              >
                 <Plus size={14} />
               </button>
             </div>
+            {qty >= maxAllowedQty && !isOutOfStock && (
+              <span className="text-xs text-muted">Max quantity selected</span>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-7">
             <button
               onClick={handleAdd}
-              className="flex-1 bg-moss text-paper rounded-full py-3.5 text-sm font-medium hover:bg-moss/90 transition-colors"
+              disabled={isOutOfStock}
+              className="flex-1 bg-moss text-paper rounded-full py-3.5 text-sm font-medium hover:bg-moss/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {added ? "Added ✓" : `Add to cart (${qty})`}
+              {isOutOfStock ? "Sold Out" : added ? "Added to Cart ✓" : `Add to Cart (${qty})`}
             </button>
-            <button className="border border-line rounded-full px-5 py-3.5 text-sm font-medium flex items-center justify-center gap-2 hover:border-gold/60 transition-colors">
-              <Heart size={15} /> Wishlist
+            {/* Functional Wishlist Button (E-16) */}
+            <button
+              onClick={toggleWishlist}
+              className={`border rounded-full px-5 py-3.5 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                isWishlisted
+                  ? "border-wine text-wine bg-wine-soft"
+                  : "border-line hover:border-gold/60 text-ink"
+              }`}
+            >
+              <Heart size={15} className={isWishlisted ? "fill-wine text-wine" : ""} />
+              {isWishlisted ? "Wishlisted" : "Wishlist"}
             </button>
           </div>
 
+          {/* Aligned trust claims (E-22) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
-            <Trust icon={ShieldCheck} title="Authentic" sub="100% Verified" />
-            <Trust icon={Truck} title="Free Shipping" sub="Worldwide" />
-            <Trust icon={RefreshCcw} title="Easy Returns" sub="30-day window" />
+            <Trust icon={ShieldCheck} title="Authentic" sub="Considered Design" />
+            <Trust icon={Truck} title="Fast Delivery" sub="$6 · Free over $150" />
+            <Trust icon={RefreshCcw} title="Returns" sub="30-day window" />
           </div>
         </div>
       </div>

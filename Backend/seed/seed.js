@@ -116,20 +116,36 @@ const products = [
 async function seed() {
   await connectDB();
 
-  await Product.deleteMany();
-  await Product.insertMany(products);
-  console.log(`Seeded ${products.length} products`);
+  const productCount = await Product.countDocuments();
+  if (productCount > 0 && process.env.ALLOW_SEED_OVERWRITE !== "true") {
+    console.warn(
+      `[EVERMORE SEED SAFEGUARD] Database already contains ${productCount} products. Skipping destructive Product.deleteMany(). Set ALLOW_SEED_OVERWRITE=true to force reseed.`
+    );
+  } else {
+    if (productCount > 0) {
+      console.log(`[EVERMORE SEED] ALLOW_SEED_OVERWRITE is set. Clearing ${productCount} existing products...`);
+      await Product.deleteMany();
+    }
+    await Product.insertMany(products);
+    console.log(`Seeded ${products.length} products successfully.`);
+  }
 
-  const adminEmail = "admin@loom.com";
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@theevermore.com";
   const existingAdmin = await User.findOne({ email: adminEmail });
   if (!existingAdmin) {
+    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || "EvermoreAdmin2026!";
     await User.create({
-      name: "Admin",
+      name: "Evermore Admin",
       email: adminEmail,
-      password: "admin123", // change this immediately after first login
+      password: adminPassword,
       role: "admin",
     });
-    console.log(`Seeded admin user: ${adminEmail} / admin123`);
+    console.log(`Created administrator user: ${adminEmail}`);
+    if (!process.env.ADMIN_INITIAL_PASSWORD) {
+      console.warn("WARNING: Default admin password was used. Please change it immediately via the account settings.");
+    }
+  } else {
+    console.log(`Admin account ${adminEmail} already exists.`);
   }
 
   await mongoose.disconnect();
@@ -137,6 +153,6 @@ async function seed() {
 }
 
 seed().catch((err) => {
-  console.error(err);
+  console.error("Seed failed:", err);
   process.exit(1);
 });

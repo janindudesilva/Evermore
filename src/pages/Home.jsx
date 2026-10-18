@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ShieldCheck, RefreshCcw, Truck, AlertCircle, Package } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import CategoryPills from "../components/CategoryPills";
-import GarmentIcon from "../components/GarmentIcon";
 import JacketVideoScrubber from "../components/JacketVideoScrubber";
 import { getProductsApi } from "../utils/api";
 

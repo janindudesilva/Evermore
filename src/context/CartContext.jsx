@@ -1,17 +1,41 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem("evermore_cart");
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("evermore_cart", JSON.stringify(items));
+    } catch (e) {
+      console.warn("Could not persist cart to localStorage:", e);
+    }
+  }, [items]);
 
   const addItem = (product, size, qty = 1) => {
     const prodId = product._id || product.id;
+    const requestedQty = Math.max(1, parseInt(qty) || 1);
+
+    // Determine available stock for size if product has stock map
+    const sizeStock = product.stock
+      ? (product.stock[size] !== undefined ? product.stock[size] : 50)
+      : 50;
+
     setItems((prev) => {
       const key = `${prodId}-${size}`;
       const existing = prev.find((i) => i.key === key);
       if (existing) {
-        return prev.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i));
+        const cappedQty = Math.min(sizeStock, existing.qty + requestedQty);
+        return prev.map((i) => (i.key === key ? { ...i, qty: cappedQty } : i));
       }
       return [
         ...prev,
@@ -23,22 +47,41 @@ export function CartProvider({ children }) {
           type: product.type,
           color: product.color,
           size,
-          qty,
+          qty: Math.min(sizeStock, requestedQty),
+          maxStock: sizeStock,
         },
       ];
     });
   };
 
   const updateQty = (key, qty) => {
-    setItems((prev) =>
-      qty <= 0 ? prev.filter((i) => i.key !== key) : prev.map((i) => (i.key === key ? { ...i, qty } : i))
-    );
+    const parsed = parseInt(qty) || 0;
+    setItems((prev) => {
+      if (parsed <= 0) {
+        return prev.filter((i) => i.key !== key);
+      }
+      return prev.map((i) => {
+        if (i.key !== key) return i;
+        const max = i.maxStock || 50;
+        return { ...i, qty: Math.min(max, parsed) };
+      });
+    });
   };
 
   const removeItem = (key) => setItems((prev) => prev.filter((i) => i.key !== key));
-  const clearCart = () => setItems([]);
+  const clearCart = () => {
+    setItems([]);
+    try {
+      localStorage.removeItem("evermore_cart");
+    } catch (e) {
+      // Ignore
+    }
+  };
 
-  const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.price * i.qty, 0), [items]);
+  const subtotal = useMemo(
+    () => items.reduce((sum, i) => sum + Math.round(i.price * i.qty * 100) / 100, 0),
+    [items]
+  );
   const count = useMemo(() => items.reduce((sum, i) => sum + i.qty, 0), [items]);
 
   return (
@@ -48,4 +91,10 @@ export function CartProvider({ children }) {
   );
 }
 
-export const useCart = () => useContext(CartContext);
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within a CartProvider");
+  }
+  return context;
+};

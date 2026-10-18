@@ -83,7 +83,7 @@ export default function SignIn() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@loom.com"
+                  placeholder="your.email@example.com"
                   required
                   className="w-full rounded-xl border border-line bg-paper pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/35"
                 />
@@ -118,9 +118,6 @@ export default function SignIn() {
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
-            <p className="text-xs text-muted text-center pt-1">
-              Admin login: <code className="font-mono bg-paper px-1.5 py-0.5 rounded border border-line">admin@loom.com</code> / <code className="font-mono bg-paper px-1.5 py-0.5 rounded border border-line">admin123</code>
-            </p>
           </form>
 
           <div className="mt-6 pt-6 border-t border-line">

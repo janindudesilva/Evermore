@@ -1,7 +1,33 @@
-import { AtSign, MessageSquare, CirclePlay } from "lucide-react";
+import { useState } from "react";
+import { AtSign, MessageSquare, CirclePlay, CheckCircle2 } from "lucide-react";
 import logo from "../assets/Evermore Logo.jpeg";
+import { submitNewsletterApi } from "../utils/api";
 
 export default function Footer() {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [isError, setIsError] = useState(false);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    try {
+      setLoading(true);
+      setMessage(null);
+      setIsError(false);
+      const res = await submitNewsletterApi(email);
+      setMessage(res.message || "Thank you for subscribing to THE EVERMORE.");
+      setEmail("");
+    } catch (err) {
+      setIsError(true);
+      setMessage(err.message || "Subscription failed. Please check your email.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <footer className="mt-16 sm:mt-24">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-10">
@@ -9,16 +35,35 @@ export default function Footer() {
           <p className="font-mono-label text-xs text-muted uppercase mb-3">Stay Stitched In</p>
           <h3 className="font-display text-2xl sm:text-3xl font-semibold mb-3">Join the mailing list</h3>
           <p className="text-ink-soft text-sm sm:text-base mb-7 max-w-md mx-auto">
-            New drops, restocks, and the occasional discount — no more than twice a month.
+            New drops, restocks, and seasonal previews — delivered thoughtfully.
           </p>
-          <form className="flex flex-col sm:flex-row items-center gap-2.5 max-w-sm mx-auto" onSubmit={(e) => e.preventDefault()}>
+
+          {message && (
+            <div
+              className={`mb-4 max-w-sm mx-auto p-3 rounded-xl text-xs flex items-center justify-center gap-2 ${
+                isError ? "bg-wine-soft text-wine border border-wine/20" : "bg-moss-soft text-moss border border-moss/20"
+              }`}
+            >
+              {!isError && <CheckCircle2 size={14} />}
+              <span>{message}</span>
+            </div>
+          )}
+
+          <form className="flex flex-col sm:flex-row items-center gap-2.5 max-w-sm mx-auto" onSubmit={handleSubscribe}>
             <input
               type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
               className="w-full sm:flex-1 rounded-full border border-line bg-paper px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/35"
             />
-            <button className="w-full sm:w-auto rounded-full bg-moss text-paper px-5 py-2.5 text-sm font-medium whitespace-nowrap hover:bg-moss/90 transition-colors">
-              Subscribe
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full sm:w-auto rounded-full bg-moss text-paper px-5 py-2.5 text-sm font-medium whitespace-nowrap hover:bg-moss/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Subscribing..." : "Subscribe"}
             </button>
           </form>
         </div>
@@ -67,4 +112,3 @@ function FooterCol({ title, items }) {
     </div>
   );
 }
-

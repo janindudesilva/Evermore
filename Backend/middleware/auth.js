@@ -6,9 +6,16 @@ async function attachUser(req) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) return null;
   const token = header.split(" ")[1];
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  const user = await User.findById(decoded.userId);
-  return user;
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded || !decoded.userId) return null;
+    const user = await User.findById(decoded.userId);
+    return user;
+  } catch (_err) {
+    return null;
+  }
 }
 
 // Requires a valid token — use for account-only routes (e.g. order history).
@@ -18,7 +25,7 @@ export async function protect(req, res, next) {
     if (!user) return ApiResponse.error(res, "Not authorized, no valid token", 401);
     req.user = user;
     next();
-  } catch (err) {
+  } catch (_err) {
     return ApiResponse.error(res, "Not authorized, token failed", 401);
   }
 }
@@ -28,7 +35,7 @@ export async function protect(req, res, next) {
 export async function optionalAuth(req, res, next) {
   try {
     req.user = await attachUser(req);
-  } catch (err) {
+  } catch (_err) {
     req.user = null;
   }
   next();
