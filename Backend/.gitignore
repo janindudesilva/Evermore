@@ -1,5 +1,45 @@
 # Covered by root .gitignore when using the full repo; kept for Backend-only workflows
 node_modules/
+
+# Environment & secrets
 .env
 .env.*
+.env.local
+.env.*.local
 !.env.example
+!.env.*.example
+
+# Credentials & Cloud Auth
+*credential*.json
+*credentials*
+*secret*.json
+client_secret*.json
+service-account*.json
+serviceAccountKey*.json
+google-services*.json
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.p12
+*.crt
+*.cer
+*.der
+id_rsa*
+id_ed25519*
+*.keystore
+
+# Package manager & developer auth configs
+.npmrc
+.yarnrc
+.netrc
+
+# Database dumps, local data & backups
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql
+*.bak
+*.old
+*.orig
