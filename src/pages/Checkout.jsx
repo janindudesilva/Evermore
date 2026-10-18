@@ -1,9 +1,33 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, AlertCircle, ShoppingBag, ArrowRight, Truck } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { fetchJson } from "../utils/api";
+
+function generateUuid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// Compute deterministic payload fingerprint to detect if checkout payload actually changed
+function computeCheckoutFingerprint(items, formData) {
+  const itemSummary = (items || [])
+    .map((i) => `${i.id || i.productId}:${i.size}:${i.qty}`)
+    .sort()
+    .join("|");
+  const customerSummary = [
+    formData.name?.trim().toLowerCase(),
+    formData.email?.trim().toLowerCase(),
+    formData.phone?.trim(),
+    formData.address?.trim().toLowerCase(),
+    formData.city?.trim().toLowerCase(),
+    formData.postalCode?.trim(),
+  ].join("|");
+  return `${itemSummary}::${customerSummary}`;
+}
 
 export default function Checkout() {
   const { items, subtotal, clearCart } = useCart();
@@ -21,6 +45,7 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [order, setOrder] = useState(null);
+  const submittingRef = useRef(false);
 
   // Aligned shipping rule: $6 flat fee, free over $150
   const shipping = items.length ? (subtotal >= 150 ? 0 : 6) : 0;
@@ -31,8 +56,10 @@ export default function Checkout() {
   };
 
   const handlePlaceOrder = async (e) => {
-    e.preventDefault();
-    if (items.length === 0) return;
+    if (e && e.preventDefault) e.preventDefault();
+
+    // Prevent repeated clicks from creating duplicate orders (Task A.4 & A.5)
+    if (loading || submittingRef.current || items.length === 0) return;
 
     // Validate required fields
     if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
@@ -45,6 +72,7 @@ export default function Checkout() {
     }
 
     try {
+      submittingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -54,10 +82,35 @@ export default function Checkout() {
         qty: Number(i.qty),
       }));
 
-      // Generate a client idempotency key to prevent accidental duplicate charges
-      const idempotencyKey = typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      // Task A.1 & A.2: Generate/retrieve stable idempotency key for this checkout attempt
+      const currentFingerprint = computeCheckoutFingerprint(items, formData);
+      let idempotencyKey = null;
+
+      try {
+        const storedAttemptRaw = sessionStorage.getItem("evermore_checkout_attempt");
+        if (storedAttemptRaw) {
+          const stored = JSON.parse(storedAttemptRaw);
+          if (stored && stored.key && stored.fingerprint === currentFingerprint) {
+            // Reuse identical key for retrying an uncertain request or after page refresh
+            idempotencyKey = stored.key;
+          }
+        }
+      } catch (storageErr) {
+        // Ignore JSON/sessionStorage parsing issues
+      }
+
+      // Task A.3: Generate a new key only when a genuinely new checkout attempt begins
+      if (!idempotencyKey) {
+        idempotencyKey = generateUuid();
+        try {
+          sessionStorage.setItem(
+            "evermore_checkout_attempt",
+            JSON.stringify({ key: idempotencyKey, fingerprint: currentFingerprint })
+          );
+        } catch (storageErr) {
+          // Ignore sessionStorage write issues
+        }
+      }
 
       const orderPayload = {
         items: orderItems,
@@ -78,10 +131,19 @@ export default function Checkout() {
 
       const res = await fetchJson("/api/orders", {
         method: "POST",
+        headers: {
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify(orderPayload),
       });
 
       if (res && res.success && res.data) {
+        // Success: clear the stored attempt and empty the cart
+        try {
+          sessionStorage.removeItem("evermore_checkout_attempt");
+        } catch (storageErr) {
+          // Ignore
+        }
         setOrder(res.data);
         clearCart();
       } else {
@@ -89,9 +151,10 @@ export default function Checkout() {
       }
     } catch (err) {
       console.error("Order submission failure:", err);
-      // Explicit error display; never generate fake mock orders or clear cart
+      // Task A.6: Preserve the cart when a request fails; do not clear cart on error
       setError(err.message || "Could not process order. Please check connection and try again.");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -151,6 +214,11 @@ export default function Checkout() {
             <div className="flex justify-between text-sm text-muted">
               <span>Payment Method</span>
               <span className="font-mono-label uppercase text-ink">Cash on Delivery</span>
+            </div>
+
+            <div className="flex justify-between text-sm text-muted">
+              <span>Payment Status</span>
+              <span className="font-mono-label uppercase text-ink">{order.paymentStatus || "pending"}</span>
             </div>
 
             <div className="pt-2 flex justify-between text-sm font-medium">
@@ -227,9 +295,19 @@ export default function Checkout() {
         )}
 
         {error && (
-          <div className="mb-6 p-4 bg-wine-soft text-wine border border-wine/20 rounded-2xl text-sm flex items-center gap-2.5">
-            <AlertCircle size={18} className="shrink-0" />
-            <span>{error}</span>
+          <div className="mb-6 p-4 bg-wine-soft text-wine border border-wine/20 rounded-2xl text-sm flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={handlePlaceOrder}
+              disabled={loading}
+              className="shrink-0 px-3 py-1 rounded-full bg-wine text-paper text-xs font-medium hover:bg-wine/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Retrying..." : "Retry"}
+            </button>
           </div>
         )}
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import User from "../models/User.js";
@@ -25,8 +25,8 @@ function createMockRes() {
   };
 }
 
-test("Setup in-memory MongoDB test instance", async () => {
-  mongod = await MongoMemoryServer.create();
+test("Setup in-memory MongoDB replica set test instance", async () => {
+  mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   const uri = mongod.getUri();
   await mongoose.connect(uri);
   assert.equal(mongoose.connection.readyState, 1, "Mongoose must be connected to in-memory instance");

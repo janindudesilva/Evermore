@@ -35,7 +35,7 @@ export async function register(req, res) {
     const token = generateToken(user);
     return ApiResponse.success(res, "Account created successfully", { user, token }, 201);
   } catch (err) {
-    console.error("Register error:", err);
+    console.error("Register error:", err.message || "Registration failed");
     return ApiResponse.error(res, "Could not register account. Please check your information.", 500);
   }
 }
@@ -56,7 +56,7 @@ export async function login(req, res) {
     const token = generateToken(user);
     return ApiResponse.success(res, "Signed in successfully", { user, token });
   } catch (err) {
-    console.error("Login error:", err);
+    console.error("Login error:", err.message || "Sign in failed");
     return ApiResponse.error(res, "Sign in failed. Please try again.", 500);
   }
 }
@@ -72,20 +72,21 @@ export async function updateProfile(req, res) {
     const user = await User.findById(req.user._id);
     if (!user) return ApiResponse.error(res, "User not found", 404);
 
-    if (name && name.trim()) user.name = name.trim();
-    if (phone !== undefined) user.phone = phone.trim();
+    if (name && typeof name === "string" && name.trim()) user.name = name.trim();
+    if (phone !== undefined && typeof phone === "string") user.phone = phone.trim();
     if (address && typeof address === "object") {
       user.address = {
-        line1: address.line1 || user.address?.line1 || "",
-        city: address.city || user.address?.city || "",
-        postalCode: address.postalCode || user.address?.postalCode || "",
+        line1: (typeof address.line1 === "string" ? address.line1.trim() : user.address?.line1) || "",
+        city: (typeof address.city === "string" ? address.city.trim() : user.address?.city) || "",
+        postalCode: (typeof address.postalCode === "string" ? address.postalCode.trim() : user.address?.postalCode) || "",
       };
     }
 
+    // Protected fields (role, email, password) are strictly immutable via this route
     await user.save();
     return ApiResponse.success(res, "Profile updated successfully", user);
   } catch (err) {
-    console.error("Profile update error:", err);
+    console.error("Profile update error:", err.message || "Failed to update profile");
     return ApiResponse.error(res, "Failed to update profile", 400);
   }
 }

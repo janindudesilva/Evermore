@@ -70,6 +70,7 @@ const orderSchema = new mongoose.Schema(
     subtotal: { type: Number, required: true, min: 0 },
     shipping: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },
+    currency: { type: String, default: "USD", uppercase: true, trim: true },
     status: {
       type: String,
       enum: [
@@ -100,10 +101,32 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid", "failed", "refunded", "cancelled"],
       default: "pending",
     },
+    paymentDetails: {
+      collectedAt: { type: Date, default: null },
+      collectedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      amountCollected: { type: Number, default: null },
+      note: { type: String, default: "" },
+    },
+    paymentHistory: [
+      {
+        paymentStatus: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        note: { type: String, default: "" },
+      },
+    ],
     idempotencyKey: {
       type: String,
       unique: true,
       sparse: true,
+    },
+    idempotencyPayloadHash: {
+      type: String,
+      default: null,
+    },
+    inventoryRestored: {
+      type: Boolean,
+      default: false,
     },
     customer: {
       type: customerSchema,

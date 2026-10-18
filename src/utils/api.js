@@ -90,7 +90,14 @@ export async function getProductsApi(cat = "All", query = "", page = 1, limit = 
   const response = await fetchJson(`/api/products${queryString}`);
 
   if (Array.isArray(response.data)) {
-    return response.data;
+    const list = [...response.data];
+    list.pagination = response.pagination || {
+      page: Number(page) || 1,
+      limit: Number(limit) || 50,
+      total: response.data.length,
+      pages: 1,
+    };
+    return list;
   }
   return [];
 }
@@ -119,11 +126,40 @@ export async function submitContactApi(formData) {
 }
 
 /**
- * Submit newsletter subscription to backend.
+ * Submit newsletter subscription to backend with consent.
  */
-export async function submitNewsletterApi(email) {
+export async function submitNewsletterApi(email, consent = true) {
   return fetchJson("/api/inquiries/newsletter", {
     method: "POST",
+    body: JSON.stringify({ email, consent }),
+  });
+}
+
+/**
+ * Unsubscribe from newsletter.
+ */
+export async function unsubscribeNewsletterApi(email) {
+  return fetchJson("/api/inquiries/newsletter/unsubscribe", {
+    method: "POST",
     body: JSON.stringify({ email }),
+  });
+}
+
+/**
+ * Fetch inquiries for admin dashboard review.
+ */
+export async function getInquiriesApi(page = 1, limit = 20, status = "") {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (status) params.append("status", status);
+  return fetchJson(`/api/inquiries?${params.toString()}`);
+}
+
+/**
+ * Update inquiry status (admin only).
+ */
+export async function updateInquiryStatusApi(id, status, notes = "") {
+  return fetchJson(`/api/inquiries/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status, notes }),
   });
 }

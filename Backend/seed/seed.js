@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { connectDB } from "../config/db.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
+import Order from "../models/Order.js";
 import mongoose from "mongoose";
 
 dotenv.config();
@@ -116,36 +117,67 @@ const products = [
 async function seed() {
   await connectDB();
 
+  const isProduction = process.env.NODE_ENV === "production";
+  const orderCount = await Order.countDocuments();
   const productCount = await Product.countDocuments();
-  if (productCount > 0 && process.env.ALLOW_SEED_OVERWRITE !== "true") {
-    console.warn(
-      `[EVERMORE SEED SAFEGUARD] Database already contains ${productCount} products. Skipping destructive Product.deleteMany(). Set ALLOW_SEED_OVERWRITE=true to force reseed.`
+
+  if (isProduction && process.env.ALLOW_SEED_OVERWRITE === "true") {
+    console.error(
+      "[EVERMORE SEED SAFEGUARD] Destructive seed operations (ALLOW_SEED_OVERWRITE) are strictly prohibited in production."
     );
-  } else {
-    if (productCount > 0) {
-      console.log(`[EVERMORE SEED] ALLOW_SEED_OVERWRITE is set. Clearing ${productCount} existing products...`);
-      await Product.deleteMany();
-    }
-    await Product.insertMany(products);
-    console.log(`Seeded ${products.length} products successfully.`);
+    await mongoose.disconnect();
+    process.exit(1);
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@theevermore.com";
-  const existingAdmin = await User.findOne({ email: adminEmail });
-  if (!existingAdmin) {
-    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || "EvermoreAdmin2026!";
-    await User.create({
-      name: "Evermore Admin",
-      email: adminEmail,
-      password: adminPassword,
-      role: "admin",
-    });
-    console.log(`Created administrator user: ${adminEmail}`);
-    if (!process.env.ADMIN_INITIAL_PASSWORD) {
-      console.warn("WARNING: Default admin password was used. Please change it immediately via the account settings.");
-    }
+  if (orderCount > 0 && process.env.ALLOW_SEED_OVERWRITE === "true") {
+    console.error(
+      `[EVERMORE SEED SAFEGUARD] Refusing to delete products: ${orderCount} existing order(s) detected in database. Erasing products would corrupt order history.`
+    );
+    await mongoose.disconnect();
+    process.exit(1);
+  }
+
+  if (productCount > 0 && process.env.ALLOW_SEED_OVERWRITE !== "true") {
+    console.warn(
+      `[EVERMORE SEED SAFEGUARD] Database already contains ${productCount} products. Skipping destructive Product.deleteMany(). Set ALLOW_SEED_OVERWRITE=true to force reseed in non-production environments with zero existing orders.`
+    );
+  } else if (productCount > 0 && process.env.ALLOW_SEED_OVERWRITE === "true") {
+    console.log(
+      `[EVERMORE SEED] ALLOW_SEED_OVERWRITE is set and 0 orders present. Clearing ${productCount} existing products...`
+    );
+    await Product.deleteMany();
+    await Product.insertMany(products);
+    console.log(`Seeded ${products.length} products successfully.`);
   } else {
-    console.log(`Admin account ${adminEmail} already exists.`);
+    await Product.insertMany(products);
+    console.log(`Seeded initial ${products.length} products successfully.`);
+  }
+
+  // Administrator provisioning: requires explicit environment variables without hardcoded fallbacks
+  const adminEmail = process.env.ADMIN_EMAIL ? process.env.ADMIN_EMAIL.toLowerCase().trim() : null;
+  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD ? process.env.ADMIN_INITIAL_PASSWORD.trim() : null;
+
+  if (!adminEmail || !adminPassword) {
+    console.warn(
+      "[EVERMORE ADMIN PROVISIONING] Admin provisioning skipped: ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD must both be explicitly configured in the environment. Hardcoded fallback administrator passwords are prohibited."
+    );
+  } else if (adminPassword.length < 8) {
+    console.error(
+      "[EVERMORE ADMIN PROVISIONING] Admin provisioning rejected: ADMIN_INITIAL_PASSWORD must be at least 8 characters long."
+    );
+  } else {
+    const existingAdmin = await User.findOne({ email: adminEmail });
+    if (!existingAdmin) {
+      await User.create({
+        name: "Evermore Admin",
+        email: adminEmail,
+        password: adminPassword,
+        role: "admin",
+      });
+      console.log("[EVERMORE ADMIN PROVISIONING] Administrator user provisioned successfully via explicit environment configuration.");
+    } else {
+      console.log(`[EVERMORE ADMIN PROVISIONING] Admin account already exists.`);
+    }
   }
 
   await mongoose.disconnect();
@@ -153,6 +185,6 @@ async function seed() {
 }
 
 seed().catch((err) => {
-  console.error("Seed failed:", err);
+  console.error("Seed failed:", err.message || err);
   process.exit(1);
 });

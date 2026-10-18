@@ -65,7 +65,11 @@ const productSchema = new mongoose.Schema(
     reviews: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { flattenMaps: true },
+    toObject: { flattenMaps: true },
+  }
 );
 
 // Compound and text indexes for search, filtering, and admin listing

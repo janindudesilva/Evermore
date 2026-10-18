@@ -90,19 +90,44 @@ export async function createProduct(req, res) {
       );
     }
 
-    // Initialize default stock map if sizes provided but stock omitted
-    if (Array.isArray(payload.sizes) && (!payload.stock || Object.keys(payload.stock).length === 0)) {
-      const defaultStock = {};
-      for (const size of payload.sizes) {
-        defaultStock[size] = 10;
-      }
-      payload.stock = defaultStock;
+    const priceNum = Number(payload.price);
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      return ApiResponse.error(res, "Price must be a non-negative number", 400);
     }
+    payload.price = priceNum;
+
+    // Require explicit clothing sizes
+    if (!Array.isArray(payload.sizes) || payload.sizes.length === 0) {
+      return ApiResponse.error(res, "Product must have at least one clothing size specified", 400);
+    }
+
+    // Require explicit valid stock quantities per selected size; remove automatic assumptions of 10 units
+    if (!payload.stock || typeof payload.stock !== "object" || Array.isArray(payload.stock)) {
+      return ApiResponse.error(
+        res,
+        "Explicit stock quantities are required for all selected sizes before making product available",
+        400
+      );
+    }
+
+    const sanitizedStock = {};
+    for (const size of payload.sizes) {
+      const rawVal = payload.stock[size];
+      if (rawVal === undefined || rawVal === null || rawVal === "") {
+        return ApiResponse.error(res, `Explicit stock quantity is required for size '${size}'`, 400);
+      }
+      const num = Number(rawVal);
+      if (!Number.isInteger(num) || num < 0) {
+        return ApiResponse.error(res, `Stock quantity for size '${size}' must be a non-negative integer`, 400);
+      }
+      sanitizedStock[size] = num;
+    }
+    payload.stock = sanitizedStock;
 
     const product = await Product.create(payload);
     return ApiResponse.success(res, "Product created successfully", product, 201);
   } catch (err) {
-    console.error("Create product error:", err);
+    console.error("Create product error:", err.message || "Failed to create product");
     return ApiResponse.error(res, err.message || "Failed to create product", 400);
   }
 }
@@ -112,15 +137,76 @@ export async function updateProduct(req, res) {
   try {
     const payload = sanitizeProductPayload(req.body);
 
+    const existing = await Product.findById(req.params.id);
+    if (!existing) return ApiResponse.error(res, "Product not found", 404);
+
+    if (payload.price !== undefined) {
+      const priceNum = Number(payload.price);
+      if (!Number.isFinite(priceNum) || priceNum < 0) {
+        return ApiResponse.error(res, "Price must be a non-negative number", 400);
+      }
+      payload.price = priceNum;
+    }
+
+    if (payload.sizes !== undefined) {
+      if (!Array.isArray(payload.sizes) || payload.sizes.length === 0) {
+        return ApiResponse.error(res, "Product must have at least one clothing size specified", 400);
+      }
+    }
+
+    const existingStock = existing.stock instanceof Map
+      ? Object.fromEntries(existing.stock)
+      : (existing.stock || {});
+
+    // Do not automatically overwrite existing product inventory during editing
+    if (payload.stock === undefined) {
+      if (payload.sizes !== undefined) {
+        // Sizes updated without stock payload: preserve existing stock for remaining sizes
+        const preservedStock = {};
+        for (const s of payload.sizes) {
+          if (existingStock[s] !== undefined) {
+            preservedStock[s] = existingStock[s];
+          } else {
+            return ApiResponse.error(
+              res,
+              `Explicit stock quantity is required for newly added size '${s}'`,
+              400
+            );
+          }
+        }
+        payload.stock = preservedStock;
+      }
+    } else {
+      // Stock explicitly provided in update: validate all quantities strictly
+      if (typeof payload.stock !== "object" || payload.stock === null || Array.isArray(payload.stock)) {
+        return ApiResponse.error(res, "Stock must be an object mapping sizes to quantities", 400);
+      }
+
+      const targetSizes = payload.sizes || existing.sizes || Object.keys(payload.stock);
+      const sanitizedStock = {};
+
+      for (const size of targetSizes) {
+        const rawVal = payload.stock[size] !== undefined ? payload.stock[size] : existingStock[size];
+        if (rawVal === undefined || rawVal === null || rawVal === "") {
+          return ApiResponse.error(res, `Explicit stock quantity is required for size '${size}'`, 400);
+        }
+        const num = Number(rawVal);
+        if (!Number.isInteger(num) || num < 0) {
+          return ApiResponse.error(res, `Stock quantity for size '${size}' must be a non-negative integer`, 400);
+        }
+        sanitizedStock[size] = num;
+      }
+      payload.stock = sanitizedStock;
+    }
+
     const product = await Product.findByIdAndUpdate(req.params.id, payload, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     });
 
-    if (!product) return ApiResponse.error(res, "Product not found", 404);
     return ApiResponse.success(res, "Product updated successfully", product);
   } catch (err) {
-    console.error("Update product error:", err);
+    console.error("Update product error:", err.message || "Failed to update product");
     return ApiResponse.error(res, err.message || "Failed to update product", 400);
   }
 }
@@ -132,13 +218,13 @@ export async function deleteProduct(req, res) {
     const product = await Product.findByIdAndUpdate(
       req.params.id,
       { isActive: false },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!product) return ApiResponse.error(res, "Product not found", 404);
 
     return ApiResponse.success(res, "Product deactivated successfully", { id: req.params.id });
   } catch (err) {
-    console.error("Delete product error:", err);
+    console.error("Delete product error:", err.message || "Failed to delete product");
     return ApiResponse.error(res, "Failed to delete product", 500);
   }
 }

@@ -2,7 +2,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 import app from "../server.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
@@ -20,7 +20,7 @@ describe("EVERMORE End-to-End API Workflows", () => {
   let authOrderId;
 
   before(async () => {
-    mongod = await MongoMemoryServer.create();
+    mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     await mongoose.connect(mongod.getUri());
 
     // Seed Admin user

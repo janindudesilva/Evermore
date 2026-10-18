@@ -6,6 +6,7 @@ import {
   getOrderById,
   updateOrderStatus,
   cancelMyOrder,
+  recordOrderPayment,
 } from "../controllers/orderController.js";
 import { protect, optionalAuth, adminOnly } from "../middleware/auth.js";
 import { orderRateLimiter } from "../middleware/rateLimiter.js";
@@ -23,5 +24,6 @@ router.get("/:id", protect, getOrderById);
 // Admin endpoints
 router.get("/", protect, adminOnly, getAllOrders);
 router.put("/:id/status", protect, adminOnly, updateOrderStatus);
+router.put("/:id/payment", protect, adminOnly, recordOrderPayment);
 
 export default router;

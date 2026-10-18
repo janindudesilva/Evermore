@@ -1,12 +1,12 @@
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 import mongoose from "mongoose";
 
 process.env.NODE_ENV = "test";
 
 async function main() {
-  const mongod = await MongoMemoryServer.create();
+  const mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(mongod.getUri());
-  console.log("In-memory MongoDB started for live demo/e2e testing.");
+  console.log("In-memory MongoDB replica set started for live demo/e2e testing.");
 
   const Product = (await import("./models/Product.js")).default;
   const User = (await import("./models/User.js")).default;

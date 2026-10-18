@@ -25,17 +25,22 @@ export function CartProvider({ children }) {
     const prodId = product._id || product.id;
     const requestedQty = Math.max(1, parseInt(qty) || 1);
 
-    // Determine available stock for size if product has stock map
-    const sizeStock = product.stock
-      ? (product.stock[size] !== undefined ? product.stock[size] : 50)
-      : 50;
+    const rawStock = product.stock instanceof Map
+      ? Object.fromEntries(product.stock)
+      : (product.stock || {});
+
+    // Respect real inventory: if size has 0 stock, do not allow adding phantom units
+    const sizeStock = rawStock[size] !== undefined ? Number(rawStock[size]) : 0;
+    if (sizeStock <= 0) {
+      return false;
+    }
 
     setItems((prev) => {
       const key = `${prodId}-${size}`;
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         const cappedQty = Math.min(sizeStock, existing.qty + requestedQty);
-        return prev.map((i) => (i.key === key ? { ...i, qty: cappedQty } : i));
+        return prev.map((i) => (i.key === key ? { ...i, qty: cappedQty, maxStock: sizeStock } : i));
       }
       return [
         ...prev,
@@ -52,6 +57,7 @@ export function CartProvider({ children }) {
         },
       ];
     });
+    return true;
   };
 
   const updateQty = (key, qty) => {

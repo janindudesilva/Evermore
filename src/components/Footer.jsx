@@ -1,28 +1,44 @@
 import { useState } from "react";
 import { AtSign, MessageSquare, CirclePlay, CheckCircle2 } from "lucide-react";
 import logo from "../assets/Evermore Logo.jpeg";
-import { submitNewsletterApi } from "../utils/api";
+import { submitNewsletterApi, unsubscribeNewsletterApi } from "../utils/api";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [mode, setMode] = useState("subscribe"); // "subscribe" | "unsubscribe"
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [isError, setIsError] = useState(false);
 
-  const handleSubscribe = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim()) return;
+
+    if (mode === "subscribe" && !consent) {
+      setIsError(true);
+      setMessage("Please confirm your consent to receive newsletters.");
+      return;
+    }
 
     try {
       setLoading(true);
       setMessage(null);
       setIsError(false);
-      const res = await submitNewsletterApi(email);
-      setMessage(res.message || "Thank you for subscribing to THE EVERMORE.");
-      setEmail("");
+
+      if (mode === "subscribe") {
+        const res = await submitNewsletterApi(email, consent);
+        setMessage(res.message || "Thank you for subscribing to THE EVERMORE.");
+        setEmail("");
+        setConsent(false);
+      } else {
+        const res = await unsubscribeNewsletterApi(email);
+        setMessage(res.message || "You have been unsubscribed from the newsletter.");
+        setEmail("");
+      }
     } catch (err) {
       setIsError(true);
-      setMessage(err.message || "Subscription failed. Please check your email.");
+      setMessage(err.message || "Operation failed. Please check your email address.");
     } finally {
       setLoading(false);
     }
@@ -33,9 +49,13 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-10">
         <div className="bg-card border border-line rounded-3xl px-5 sm:px-8 py-8 sm:py-12 text-center mb-10 sm:mb-14">
           <p className="font-mono-label text-xs text-muted uppercase mb-3">Stay Stitched In</p>
-          <h3 className="font-display text-2xl sm:text-3xl font-semibold mb-3">Join the mailing list</h3>
+          <h3 className="font-display text-2xl sm:text-3xl font-semibold mb-3">
+            {mode === "subscribe" ? "Join the mailing list" : "Unsubscribe from mailing list"}
+          </h3>
           <p className="text-ink-soft text-sm sm:text-base mb-7 max-w-md mx-auto">
-            New drops, restocks, and seasonal previews — delivered thoughtfully.
+            {mode === "subscribe"
+              ? "New drops, restocks, and seasonal previews — delivered thoughtfully."
+              : "Enter your email address to remove yourself from our newsletter list."}
           </p>
 
           {message && (
@@ -49,22 +69,65 @@ export default function Footer() {
             </div>
           )}
 
-          <form className="flex flex-col sm:flex-row items-center gap-2.5 max-w-sm mx-auto" onSubmit={handleSubscribe}>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full sm:flex-1 rounded-full border border-line bg-paper px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/35"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full sm:w-auto rounded-full bg-moss text-paper px-5 py-2.5 text-sm font-medium whitespace-nowrap hover:bg-moss/90 transition-colors disabled:opacity-50"
-            >
-              {loading ? "Subscribing..." : "Subscribe"}
-            </button>
+          <form className="max-w-sm mx-auto space-y-3" onSubmit={handleSubmit}>
+            <div className="flex flex-col sm:flex-row items-center gap-2.5">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full sm:flex-1 rounded-full border border-line bg-paper px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gold/35"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full sm:w-auto rounded-full bg-moss text-paper px-5 py-2.5 text-sm font-medium whitespace-nowrap hover:bg-moss/90 transition-colors disabled:opacity-50"
+              >
+                {loading ? "Processing..." : mode === "subscribe" ? "Subscribe" : "Unsubscribe"}
+              </button>
+            </div>
+
+            {mode === "subscribe" && (
+              <label className="flex items-center justify-center gap-2 text-xs text-muted cursor-pointer text-left px-2">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  required
+                  className="rounded border-line text-moss focus:ring-gold/35 shrink-0"
+                />
+                <span>I agree to receive THE EVERMORE journal and agree to the privacy policy.</span>
+              </label>
+            )}
+
+            <div className="pt-1">
+              {mode === "subscribe" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("unsubscribe");
+                    setMessage(null);
+                    setIsError(false);
+                  }}
+                  className="text-xs text-muted hover:text-ink underline transition-colors"
+                >
+                  Need to unsubscribe?
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("subscribe");
+                    setMessage(null);
+                    setIsError(false);
+                  }}
+                  className="text-xs text-muted hover:text-ink underline transition-colors"
+                >
+                  ← Back to newsletter subscription
+                </button>
+              )}
+            </div>
           </form>
         </div>
 

@@ -1,6 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { Navigate } from "react-router-dom";
-import { Plus, Package, ShoppingBag, LayoutGrid, Trash2, Edit2, AlertCircle, X, Image, RefreshCw } from "lucide-react";
+import {
+  Plus,
+  Package,
+  ShoppingBag,
+  LayoutGrid,
+  Trash2,
+  Edit2,
+  AlertCircle,
+  X,
+  Image,
+  RefreshCw,
+  MessageSquare,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import GarmentIcon from "../components/GarmentIcon";
 import { getProductsApi, fetchJson } from "../utils/api";
@@ -9,13 +21,31 @@ const ALL_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 export default function AdminDashboard() {
   const { user, authFetch } = useAuth();
-  const [tab, setTab] = useState("products");
+  const [tab, setTab] = useState("products"); // "products" | "orders" | "inquiries"
+
+  // Products state & pagination (Task C)
   const [items, setItems] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [productsPage, setProductsPage] = useState(1);
+  const productsLimit = 10;
+  const [productsPagination, setProductsPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Orders state & pagination (Task C)
+  const [orders, setOrders] = useState([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ordersLimit = 10;
+  const [ordersPagination, setOrdersPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState(null);
+
+  // Inquiries state & pagination (Part A & C)
+  const [inquiries, setInquiries] = useState([]);
+  const [inquiriesPage, setInquiriesPage] = useState(1);
+  const inquiriesLimit = 10;
+  const [inquiriesPagination, setInquiriesPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [inquiriesError, setInquiriesError] = useState(null);
 
   // Form states
   const [editingId, setEditingId] = useState(null);
@@ -27,31 +57,35 @@ export default function AdminDashboard() {
     color: "#1C1B19",
     description: "",
     images: "",
-    sizes: ["S", "M", "L"],
-    stock: { S: 10, M: 10, L: 10 },
+    sizes: [],
+    stock: {},
   });
   const [saving, setSaving] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (page = productsPage) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getProductsApi();
+      const data = await getProductsApi("All", "", page, productsLimit);
       setItems(data);
+      if (data.pagination) {
+        setProductsPagination(data.pagination);
+        setProductsPage(data.pagination.page);
+      }
     } catch (err) {
       console.error("Admin fetch items error:", err);
       setError(err.message || "Could not load products from server.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [productsPage, productsLimit]);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (page = ordersPage) => {
     try {
       setOrdersLoading(true);
       setOrdersError(null);
-      const res = await authFetch("/api/orders");
+      const res = await authFetch(`/api/orders?page=${page}&limit=${ordersLimit}`);
       const data = await res.json();
       if (res.ok && data.success) {
         const orderList = Array.isArray(data.data?.orders)
@@ -70,8 +104,13 @@ export default function AdminDashboard() {
             status: o.status || "pending",
             paymentMethod: o.paymentMethod || "cod",
             paymentStatus: o.paymentStatus || "pending",
+            createdAt: o.createdAt,
           }))
         );
+        if (data.data?.pagination) {
+          setOrdersPagination(data.data.pagination);
+          setOrdersPage(data.data.pagination.page);
+        }
       } else {
         throw new Error(data.message || "Failed to load orders");
       }
@@ -81,15 +120,38 @@ export default function AdminDashboard() {
     } finally {
       setOrdersLoading(false);
     }
-  }, [authFetch]);
+  }, [authFetch, ordersPage, ordersLimit]);
 
-  // Unconditional hook invocations
+  const fetchInquiries = useCallback(async (page = inquiriesPage) => {
+    try {
+      setInquiriesLoading(true);
+      setInquiriesError(null);
+      const res = await authFetch(`/api/inquiries?page=${page}&limit=${inquiriesLimit}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setInquiries(data.data?.inquiries || []);
+        if (data.data?.pagination) {
+          setInquiriesPagination(data.data.pagination);
+          setInquiriesPage(data.data.pagination.page);
+        }
+      } else {
+        throw new Error(data.message || "Failed to load inquiries");
+      }
+    } catch (err) {
+      console.error("Admin fetch inquiries error:", err);
+      setInquiriesError(err.message || "Could not fetch customer inquiries.");
+    } finally {
+      setInquiriesLoading(false);
+    }
+  }, [authFetch, inquiriesPage, inquiriesLimit]);
+
   useEffect(() => {
     if (user && user.role === "admin") {
-      fetchItems();
-      fetchOrders();
+      fetchItems(1);
+      fetchOrders(1);
+      fetchInquiries(1);
     }
-  }, [user, fetchItems, fetchOrders]);
+  }, [user]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -101,8 +163,8 @@ export default function AdminDashboard() {
       color: "#1C1B19",
       description: "",
       images: "",
-      sizes: ["S", "M", "L"],
-      stock: { S: 10, M: 10, L: 10 },
+      sizes: [],
+      stock: {},
     });
   };
 
@@ -110,14 +172,14 @@ export default function AdminDashboard() {
     const prodId = product._id || product.id;
     setEditingId(prodId);
 
-    const productSizes = Array.isArray(product.sizes) && product.sizes.length > 0
-      ? product.sizes
-      : ["S", "M", "L"];
+    const productSizes = Array.isArray(product.sizes) ? product.sizes : [];
+    const rawStock = product.stock instanceof Map
+      ? Object.fromEntries(product.stock)
+      : (product.stock || {});
 
-    const rawStock = product.stock || {};
     const stockMap = {};
     for (const s of productSizes) {
-      stockMap[s] = rawStock[s] !== undefined ? rawStock[s] : 10;
+      stockMap[s] = rawStock[s] !== undefined ? rawStock[s] : 0;
     }
 
     setForm({
@@ -138,15 +200,25 @@ export default function AdminDashboard() {
       const exists = prev.sizes.includes(size);
       const newSizes = exists ? prev.sizes.filter((s) => s !== size) : [...prev.sizes, size];
       const newStock = { ...prev.stock };
-      if (!exists && newStock[size] === undefined) {
-        newStock[size] = 10;
+      if (exists) {
+        delete newStock[size];
+      } else if (newStock[size] === undefined) {
+        newStock[size] = 0;
       }
       return { ...prev, sizes: newSizes, stock: newStock };
     });
   };
 
-  const handleStockChange = (size, qty) => {
-    const parsed = Math.max(0, parseInt(qty) || 0);
+  const handleStockChange = (size, val) => {
+    if (val === "") {
+      setForm((prev) => ({
+        ...prev,
+        stock: { ...prev.stock, [size]: "" },
+      }));
+      return;
+    }
+    const parsed = parseInt(val, 10);
+    if (isNaN(parsed) || parsed < 0) return;
     setForm((prev) => ({
       ...prev,
       stock: { ...prev.stock, [size]: parsed },
@@ -160,7 +232,7 @@ export default function AdminDashboard() {
       return;
     }
     if (form.sizes.length === 0) {
-      alert("Please select at least one available size.");
+      alert("Please select at least one available clothing size.");
       return;
     }
 
@@ -173,7 +245,19 @@ export default function AdminDashboard() {
 
       const stockPayload = {};
       for (const size of form.sizes) {
-        stockPayload[size] = form.stock[size] !== undefined ? form.stock[size] : 10;
+        const val = form.stock[size];
+        if (
+          val === "" ||
+          val === undefined ||
+          val === null ||
+          isNaN(Number(val)) ||
+          Number(val) < 0 ||
+          !Number.isInteger(Number(val))
+        ) {
+          alert(`Please enter a valid non-negative integer stock quantity for size ${size}.`);
+          return;
+        }
+        stockPayload[size] = Number(val);
       }
 
       const payload = {
@@ -190,27 +274,25 @@ export default function AdminDashboard() {
       };
 
       if (editingId) {
-        // PUT /api/products/:id
         const res = await fetchJson(`/api/products/${editingId}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
 
         if (res.success && res.data) {
-          setItems((prev) => prev.map((p) => ((p._id || p.id) === editingId ? res.data : p)));
+          await fetchItems(productsPage);
           resetForm();
         } else {
           throw new Error(res.message || "Failed to update product.");
         }
       } else {
-        // POST /api/products
         const res = await fetchJson("/api/products", {
           method: "POST",
           body: JSON.stringify(payload),
         });
 
         if (res.success && res.data) {
-          setItems((prev) => [res.data, ...prev]);
+          await fetchItems(1);
           resetForm();
         } else {
           throw new Error(res.message || "Failed to create product.");
@@ -218,7 +300,6 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error("Save product error:", err);
-      // Explicitly alert error without simulating fake success (E-08)
       alert(err.message || "Failed to save product to database.");
     } finally {
       setSaving(false);
@@ -232,7 +313,7 @@ export default function AdminDashboard() {
         method: "DELETE",
       });
       if (res.success) {
-        setItems((prev) => prev.filter((p) => (p._id || p.id) !== id));
+        await fetchItems(productsPage);
         if (editingId === id) resetForm();
       } else {
         throw new Error(res.message || "Failed to deactivate product.");
@@ -251,7 +332,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.success && res.data) {
-        await fetchOrders();
+        await fetchOrders(ordersPage);
       } else {
         throw new Error(res.message || "Failed to update status");
       }
@@ -262,7 +343,42 @@ export default function AdminDashboard() {
     }
   };
 
-  // Safe render guard after all Hooks
+  const handleRecordPayment = async (rawId) => {
+    if (!confirm("Confirm manual Cash on Delivery payment collection for this order?")) return;
+    try {
+      setUpdatingOrderId(rawId);
+      const res = await fetchJson(`/api/orders/${rawId}/payment`, {
+        method: "PUT",
+        body: JSON.stringify({ note: "COD collected by administrator via dashboard" }),
+      });
+      if (res.success && res.data) {
+        await fetchOrders(ordersPage);
+      } else {
+        throw new Error(res.message || "Failed to record payment");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to record payment.");
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  const handleInquiryStatusChange = async (inquiryId, newStatus) => {
+    try {
+      const res = await fetchJson(`/api/inquiries/${inquiryId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.success && res.data) {
+        await fetchInquiries(inquiriesPage);
+      } else {
+        throw new Error(res.message || "Failed to update inquiry status");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to update inquiry status.");
+    }
+  };
+
   if (!user || user.role !== "admin") {
     return <Navigate to="/sign-in" replace />;
   }
@@ -276,88 +392,104 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
-        <Stat icon={Package} label="Active Products" value={items.length} />
-        <Stat icon={ShoppingBag} label="Orders Recorded" value={orders.length} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        <Stat icon={Package} label="Active Products" value={productsPagination.total || items.length} />
+        <Stat icon={ShoppingBag} label="Orders Recorded" value={ordersPagination.total || orders.length} />
+        <Stat icon={MessageSquare} label="Inquiries" value={inquiriesPagination.total || inquiries.length} />
         <Stat icon={LayoutGrid} label="Categories" value={4} />
       </div>
 
-      <div className="flex gap-2 mb-6 bg-card border border-line rounded-full p-1.5 w-fit">
+      <div className="flex gap-2 mb-6 bg-card border border-line rounded-full p-1.5 w-fit flex-wrap">
         <TabButton active={tab === "products"} onClick={() => setTab("products")}>
-          Products ({items.length})
+          Products ({productsPagination.total || items.length})
         </TabButton>
         <TabButton active={tab === "orders"} onClick={() => setTab("orders")}>
-          Orders ({orders.length})
+          Orders ({ordersPagination.total || orders.length})
+        </TabButton>
+        <TabButton active={tab === "inquiries"} onClick={() => setTab("inquiries")}>
+          Inquiries ({inquiriesPagination.total || inquiries.length})
         </TabButton>
       </div>
 
-      {tab === "products" ? (
+      {tab === "products" && (
         <div className="grid md:grid-cols-[1fr_360px] gap-6">
-          <div className="bg-card border border-line rounded-2xl overflow-hidden">
-            <div className="p-4 bg-paper/50 border-b border-line flex items-center justify-between">
-              <h3 className="font-medium text-sm">Catalog Garments ({items.length})</h3>
-              <button
-                onClick={fetchItems}
-                className="text-xs text-muted hover:text-ink transition-colors flex items-center gap-1"
-              >
-                <RefreshCw size={12} /> Refresh
-              </button>
+          <div className="bg-card border border-line rounded-2xl overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="p-4 bg-paper/50 border-b border-line flex items-center justify-between">
+                <h3 className="font-medium text-sm">
+                  Catalog Garments ({productsPagination.total || items.length})
+                </h3>
+                <button
+                  onClick={() => fetchItems(productsPage)}
+                  className="text-xs text-muted hover:text-ink transition-colors flex items-center gap-1"
+                >
+                  <RefreshCw size={12} /> Refresh
+                </button>
+              </div>
+
+              {error && (
+                <div className="p-4 bg-wine-soft text-wine text-xs border-b border-line flex items-center gap-2">
+                  <AlertCircle size={14} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {loading ? (
+                <div className="p-8 text-center text-muted text-sm">Loading products...</div>
+              ) : items.length === 0 ? (
+                <div className="p-8 text-center text-muted text-sm">No products found in database.</div>
+              ) : (
+                <div className="divide-y divide-line">
+                  {items.map((p) => {
+                    const prodId = p._id || p.id;
+                    const hasImage = p.images && p.images.length > 0;
+                    return (
+                      <div key={prodId} className="p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-paper border border-line flex items-center justify-center overflow-hidden shrink-0">
+                            {hasImage ? (
+                              <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <GarmentIcon type={p.type || "jacket"} color={p.color || "#1C1B19"} className="w-8 h-8" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm text-ink">{p.name}</p>
+                            <p className="text-xs text-muted">
+                              {p.category} · ${p.price} · Sizes: {(p.sizes || []).join(", ") || "None"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => startEdit(p)}
+                            className="p-1.5 rounded-lg border border-line text-ink-soft hover:text-ink hover:border-gold transition-colors"
+                            title="Edit Product"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => removeItem(prodId)}
+                            className="p-1.5 rounded-lg border border-line text-ink-soft hover:text-wine hover:border-wine/50 transition-colors"
+                            title="Deactivate Product"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {error && (
-              <div className="p-4 bg-wine-soft text-wine text-xs border-b border-line flex items-center gap-2">
-                <AlertCircle size={14} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {loading ? (
-              <div className="p-8 text-center text-muted text-sm">Loading products...</div>
-            ) : items.length === 0 ? (
-              <div className="p-8 text-center text-muted text-sm">No products found in database.</div>
-            ) : (
-              <div className="divide-y divide-line">
-                {items.map((p) => {
-                  const prodId = p._id || p.id;
-                  const hasImage = p.images && p.images.length > 0;
-                  return (
-                    <div key={prodId} className="p-4 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-paper border border-line flex items-center justify-center overflow-hidden shrink-0">
-                          {hasImage ? (
-                            <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <GarmentIcon type={p.type || "jacket"} color={p.color || "#1C1B19"} className="w-8 h-8" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm text-ink">{p.name}</p>
-                          <p className="text-xs text-muted">
-                            {p.category} · ${p.price} · Sizes: {(p.sizes || []).join(", ") || "None"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => startEdit(p)}
-                          className="p-1.5 rounded-lg border border-line text-ink-soft hover:text-ink hover:border-gold transition-colors"
-                          title="Edit Product"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => removeItem(prodId)}
-                          className="p-1.5 rounded-lg border border-line text-ink-soft hover:text-wine hover:border-wine/50 transition-colors"
-                          title="Deactivate Product"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <Pagination
+              page={productsPagination.page}
+              pages={productsPagination.pages}
+              total={productsPagination.total}
+              limit={productsPagination.limit}
+              onPageChange={(p) => fetchItems(p)}
+            />
           </div>
 
           {/* Create / Edit Form */}
@@ -425,7 +557,7 @@ export default function AdminDashboard() {
                 placeholder="#1C1B19"
               />
 
-              {/* Sizes and Stock Management (E-11) */}
+              {/* Sizes and Stock Management */}
               <div>
                 <span className="text-xs font-medium mb-1.5 block">Sizes & Stock</span>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -454,9 +586,11 @@ export default function AdminDashboard() {
                         <input
                           type="number"
                           min="0"
-                          value={form.stock[sz] !== undefined ? form.stock[sz] : 10}
+                          step="1"
+                          placeholder="0"
+                          value={form.stock[sz] !== undefined ? form.stock[sz] : 0}
                           onChange={(e) => handleStockChange(sz, e.target.value)}
-                          className="w-full text-xs rounded border border-line bg-paper px-2 py-1"
+                          className="w-full text-xs rounded border border-line bg-paper px-2 py-1 font-mono"
                         />
                       </div>
                     ))}
@@ -497,75 +631,222 @@ export default function AdminDashboard() {
             </form>
           </div>
         </div>
-      ) : (
-        <div className="bg-card border border-line rounded-2xl overflow-hidden">
-          <div className="p-4 bg-paper/50 border-b border-line flex items-center justify-between">
-            <h3 className="font-medium text-sm">All Customer Orders ({orders.length})</h3>
-            <button
-              onClick={fetchOrders}
-              className="text-xs text-muted hover:text-ink transition-colors flex items-center gap-1"
-            >
-              <RefreshCw size={12} /> Refresh Orders
-            </button>
+      )}
+
+      {tab === "orders" && (
+        <div className="bg-card border border-line rounded-2xl overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="p-4 bg-paper/50 border-b border-line flex items-center justify-between">
+              <h3 className="font-medium text-sm">All Customer Orders ({ordersPagination.total || orders.length})</h3>
+              <button
+                onClick={() => fetchOrders(ordersPage)}
+                className="text-xs text-muted hover:text-ink transition-colors flex items-center gap-1"
+              >
+                <RefreshCw size={12} /> Refresh Orders
+              </button>
+            </div>
+
+            {ordersError && (
+              <div className="p-4 bg-wine-soft text-wine text-xs border-b border-line flex items-center gap-2">
+                <AlertCircle size={14} />
+                <span>{ordersError}</span>
+              </div>
+            )}
+
+            {ordersLoading ? (
+              <div className="p-8 text-center text-muted text-sm">Loading orders...</div>
+            ) : orders.length === 0 ? (
+              <div className="p-8 text-center text-muted text-sm">No customer orders recorded yet.</div>
+            ) : (
+              <div className="divide-y divide-line">
+                {orders.map((o) => (
+                  <div
+                    key={o.rawId}
+                    className="flex items-center justify-between px-5 py-4 text-sm flex-wrap gap-3"
+                  >
+                    <div>
+                      <span className="font-mono-label block text-xs font-semibold text-ink">{o.id}</span>
+                      <span className="text-xs text-muted">{o.customer} ({o.email || "No email"})</span>
+                      {o.createdAt && (
+                        <span className="text-[11px] font-mono-label text-muted block">
+                          {new Date(o.createdAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="font-mono-label text-moss block font-medium">${o.total}</span>
+                      <span className="text-[11px] text-muted uppercase font-mono-label">
+                        {o.paymentMethod} · {o.paymentStatus}
+                      </span>
+                    </div>
+
+                    {/* Manual COD Payment Collection */}
+                    <div className="flex items-center gap-2">
+                      {o.paymentStatus === "paid" ? (
+                        <span className="text-[11px] font-mono-label text-moss bg-moss/10 border border-moss/20 px-2 py-0.5 rounded-full font-medium">
+                          PAID ✓
+                        </span>
+                      ) : o.status === "cancelled" ? (
+                        <span className="text-[11px] font-mono-label text-muted bg-paper border border-line px-2 py-0.5 rounded-full">
+                          CANCELLED
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={updatingOrderId === o.rawId}
+                          onClick={() => handleRecordPayment(o.rawId)}
+                          className="text-[11px] font-mono-label bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                          title="Record Cash on Delivery payment"
+                        >
+                          Record COD Payment
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Order Status Transition Control */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted">Status:</span>
+                      <select
+                        value={o.status}
+                        disabled={updatingOrderId === o.rawId || o.status === "cancelled" || o.status === "delivered"}
+                        onChange={(e) => handleStatusChange(o.rawId, e.target.value)}
+                        className="text-xs rounded-lg border border-line bg-paper px-2.5 py-1 font-mono-label uppercase"
+                      >
+                        <option value={o.status}>{o.status}</option>
+                        {o.status === "pending" && <option value="confirmed">confirmed</option>}
+                        {o.status === "pending" && <option value="cancelled">cancelled</option>}
+                        {o.status === "confirmed" && <option value="processing">processing</option>}
+                        {o.status === "confirmed" && <option value="cancelled">cancelled</option>}
+                        {o.status === "processing" && <option value="packed">packed</option>}
+                        {o.status === "processing" && <option value="cancelled">cancelled</option>}
+                        {o.status === "packed" && <option value="shipped">shipped</option>}
+                        {o.status === "packed" && <option value="cancelled">cancelled</option>}
+                        {o.status === "shipped" && <option value="delivered">delivered</option>}
+                        {o.status === "shipped" && <option value="cancelled">cancelled</option>}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {ordersError && (
-            <div className="p-4 bg-wine-soft text-wine text-xs border-b border-line flex items-center gap-2">
-              <AlertCircle size={14} />
-              <span>{ordersError}</span>
-            </div>
-          )}
-
-          {ordersLoading ? (
-            <div className="p-8 text-center text-muted text-sm">Loading orders...</div>
-          ) : orders.length === 0 ? (
-            <div className="p-8 text-center text-muted text-sm">No customer orders recorded yet.</div>
-          ) : (
-            <div className="divide-y divide-line">
-              {orders.map((o) => (
-                <div
-                  key={o.rawId}
-                  className="flex items-center justify-between px-5 py-4 text-sm flex-wrap gap-3"
-                >
-                  <div>
-                    <span className="font-mono-label block text-xs font-semibold text-ink">{o.id}</span>
-                    <span className="text-xs text-muted">{o.customer} ({o.email || "No email"})</span>
-                  </div>
-                  <div>
-                    <span className="font-mono-label text-moss block font-medium">${o.total}</span>
-                    <span className="text-[11px] text-muted uppercase font-mono-label">
-                      {o.paymentMethod} · {o.paymentStatus}
-                    </span>
-                  </div>
-
-                  {/* Order Status Transition Control (E-09) */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted">Status:</span>
-                    <select
-                      value={o.status}
-                      disabled={updatingOrderId === o.rawId || o.status === "cancelled" || o.status === "delivered"}
-                      onChange={(e) => handleStatusChange(o.rawId, e.target.value)}
-                      className="text-xs rounded-lg border border-line bg-paper px-2.5 py-1 font-mono-label uppercase"
-                    >
-                      <option value={o.status}>{o.status}</option>
-                      {o.status === "pending" && <option value="confirmed">confirmed</option>}
-                      {o.status === "pending" && <option value="cancelled">cancelled</option>}
-                      {o.status === "confirmed" && <option value="processing">processing</option>}
-                      {o.status === "confirmed" && <option value="cancelled">cancelled</option>}
-                      {o.status === "processing" && <option value="packed">packed</option>}
-                      {o.status === "processing" && <option value="cancelled">cancelled</option>}
-                      {o.status === "packed" && <option value="shipped">shipped</option>}
-                      {o.status === "packed" && <option value="cancelled">cancelled</option>}
-                      {o.status === "shipped" && <option value="delivered">delivered</option>}
-                      {o.status === "shipped" && <option value="cancelled">cancelled</option>}
-                    </select>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <Pagination
+            page={ordersPagination.page}
+            pages={ordersPagination.pages}
+            total={ordersPagination.total}
+            limit={ordersPagination.limit}
+            onPageChange={(p) => fetchOrders(p)}
+          />
         </div>
       )}
+
+      {tab === "inquiries" && (
+        <div className="bg-card border border-line rounded-2xl overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="p-4 bg-paper/50 border-b border-line flex items-center justify-between">
+              <h3 className="font-medium text-sm">
+                Customer Inquiries ({inquiriesPagination.total || inquiries.length})
+              </h3>
+              <button
+                onClick={() => fetchInquiries(inquiriesPage)}
+                className="text-xs text-muted hover:text-ink transition-colors flex items-center gap-1"
+              >
+                <RefreshCw size={12} /> Refresh Inquiries
+              </button>
+            </div>
+
+            {inquiriesError && (
+              <div className="p-4 bg-wine-soft text-wine text-xs border-b border-line flex items-center gap-2">
+                <AlertCircle size={14} />
+                <span>{inquiriesError}</span>
+              </div>
+            )}
+
+            {inquiriesLoading ? (
+              <div className="p-8 text-center text-muted text-sm">Loading inquiries...</div>
+            ) : inquiries.length === 0 ? (
+              <div className="p-8 text-center text-muted text-sm">No customer inquiries recorded yet.</div>
+            ) : (
+              <div className="divide-y divide-line">
+                {inquiries.map((inq) => (
+                  <div key={inq._id} className="p-5 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="font-medium text-sm text-ink">{inq.name}</span>
+                        <span className="text-xs text-muted ml-2">({inq.email})</span>
+                        <span className="font-mono-label text-[11px] text-muted ml-3">
+                          {new Date(inq.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted">Status:</span>
+                        <select
+                          value={inq.status}
+                          onChange={(e) => handleInquiryStatusChange(inq._id, e.target.value)}
+                          className="text-xs rounded-lg border border-line bg-paper px-2.5 py-1 font-mono-label uppercase"
+                        >
+                          <option value="new">new</option>
+                          <option value="read">read</option>
+                          <option value="resolved">resolved</option>
+                          <option value="archived">archived</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p className="font-mono-label text-xs text-gold font-medium">{inq.subject}</p>
+                    <p className="text-xs text-ink-soft bg-paper/60 p-3 rounded-xl border border-line whitespace-pre-wrap">
+                      {inq.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Pagination
+            page={inquiriesPagination.page}
+            pages={inquiriesPagination.pages}
+            total={inquiriesPagination.total}
+            limit={inquiriesPagination.limit}
+            onPageChange={(p) => fetchInquiries(p)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Pagination({ page, pages, total, limit, onPageChange }) {
+  if (pages <= 1) return null;
+  const start = (page - 1) * limit + 1;
+  const end = Math.min(page * limit, total);
+
+  return (
+    <div className="flex items-center justify-between p-4 border-t border-line text-xs flex-wrap gap-2 bg-paper/30">
+      <span className="text-muted font-mono-label">
+        Showing {start}–{end} of {total}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          className="px-2.5 py-1 rounded-lg border border-line bg-paper text-ink disabled:opacity-40 hover:border-gold transition-colors"
+        >
+          Previous
+        </button>
+        <span className="font-mono-label px-2 text-muted">
+          Page {page} of {pages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= pages}
+          onClick={() => onPageChange(page + 1)}
+          className="px-2.5 py-1 rounded-lg border border-line bg-paper text-ink disabled:opacity-40 hover:border-gold transition-colors"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
